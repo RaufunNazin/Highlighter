@@ -51,8 +51,9 @@ def trim_video(input_file, timestamps_file, output_folder):
         audio_filters.append(f"[0:a]atrim=start={start}:end={end},asetpts=PTS-STARTPTS[a{idx}]")
 
     # Concatenate video and audio filters
-    concat_video = f"[{' '.join([f'v{idx}' for idx in range(len(timestamps))])}]concat=n={len(timestamps)}:v=1:a=0[vout]"
-    concat_audio = f"[{' '.join([f'a{idx}' for idx in range(len(timestamps))])}]concat=n={len(timestamps)}:v=0:a=1[aout]"
+    concat_video = f"{''.join([f'[v{idx}]' for idx in range(len(timestamps))])}concat=n={len(timestamps)}:v=1:a=0[vout]"
+    concat_audio = f"{''.join([f'[a{idx}]' for idx in range(len(timestamps))])}concat=n={len(timestamps)}:v=0:a=1[aout]"
+
 
     # Filter complex string
     filter_complex = ";".join(video_filters + audio_filters + [concat_video, concat_audio, "[vout][aout]concat=n=1:v=1:a=1[outv][outa]"])
