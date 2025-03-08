@@ -19,4 +19,4 @@ class EditHistory(Base):
     subtitle = Column(String(100), nullable=False)
     time = Column(String(100), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"))
-    user = relationship("User", back_populates="edit_history")
+    user = relationship("User", back_populates="editHistory")
