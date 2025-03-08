@@ -1,44 +1,41 @@
-# Ignore virtual environment
-venv/
-.Venv/
-ENV/
-env/
-.venv/
-
-# Byte-compiled / cache files
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Log files
+# Virtual environment
+venv/
+.env/
+.venv/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Logs and debugging
 *.log
-
-# IDE files
-.vscode/
-.idea/
-*.iml
-
-# OS-generated files
-.DS_Store
-Thumbs.db
-
-# Python dependency files
-pip-log.txt
-pip-delete-this-directory.txt
+*.out
+*.err
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
 
-# Pytest cache
+# Testing
+.tox/
+.nox/
+coverage.*
+*.cover
+.hypothesis/
 .pytest_cache/
 
-# Coverage reports
-htmlcov/
-.coverage
-*.cover
-.cache
+# IDE / Editor-specific files
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# Build and distribution files
-build/
-dist/
-*.egg-info/
+# OS-specific files
+.DS_Store
+Thumbs.db
