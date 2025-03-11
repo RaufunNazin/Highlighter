@@ -84,6 +84,6 @@ def trim_video(input_file, timestamps_file, output_folder):
 # Usage
 input_video = "input_video.mp4"
 timestamps_file = "high_sentiment.txt"
-output_folder = "output_segments"
+output_folder = "."
 
 trim_video(input_video, timestamps_file, output_folder)
