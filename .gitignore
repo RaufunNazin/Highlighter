@@ -39,3 +39,7 @@ coverage.*
 # OS-specific files
 .DS_Store
 Thumbs.db
+
+#ignore input video and output video
+input_video.mp4
+output_segments/final_output.mp4
