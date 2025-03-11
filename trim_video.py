@@ -1,6 +1,7 @@
 import re
 import subprocess
 import os
+import time
 
 def convert_to_seconds(timestamp):
     """Converts timestamp in hh:mm:ss,SSS format to seconds."""
@@ -14,12 +15,15 @@ def convert_to_seconds(timestamp):
         raise ValueError(f"Invalid timestamp format: {timestamp}")
 
 def trim_video(input_file, timestamps_file, output_folder):
+    start_time = time.time()
+    print("Starting video processing...")
+    
     # Ensure output folder exists
     os.makedirs(output_folder, exist_ok=True)
 
     # Read timestamps from the file
+    timestamps = []
     with open(timestamps_file, 'r') as f:
-        timestamps = []
         for line in f:
             parts = line.strip().split(',')
             if len(parts) < 4:
@@ -33,60 +37,53 @@ def trim_video(input_file, timestamps_file, output_folder):
             end_seconds = convert_to_seconds(end)
             timestamps.append((start_seconds, end_seconds))
 
-    print("Timestamps:", timestamps)
+    print(f"Parsed timestamps: {timestamps}")
     
-    # Create a list to hold the paths of the output segments
     video_filters = []
     audio_filters = []
     
-    # Now, iterate through and trim video based on the timestamps
     for idx, (start, end) in enumerate(timestamps):
         print(f"Processing segment {idx+1}: {start}s to {end}s")
-        
-        # Generate output file name for the segment
-        output_file = os.path.join(output_folder, f"segment_{idx+1}.mp4")
-        
-        # FFmpeg filter for trimming video and audio
         video_filters.append(f"[0:v]trim=start={start}:end={end},setpts=PTS-STARTPTS[v{idx}]")
         audio_filters.append(f"[0:a]atrim=start={start}:end={end},asetpts=PTS-STARTPTS[a{idx}]")
 
-    # Concatenate video and audio filters
     concat_video = f"{''.join([f'[v{idx}]' for idx in range(len(timestamps))])}concat=n={len(timestamps)}:v=1:a=0[vout]"
     concat_audio = f"{''.join([f'[a{idx}]' for idx in range(len(timestamps))])}concat=n={len(timestamps)}:v=0:a=1[aout]"
-
-
-    # Filter complex string
+    
     filter_complex = ";".join(video_filters + audio_filters + [concat_video, concat_audio, "[vout][aout]concat=n=1:v=1:a=1[outv][outa]"])
-
-    # Final output video path
+    
     final_output = os.path.join(output_folder, "final_output.mp4")
     
-    ffmpeg_path = r"C:\ProgramData\chocolatey\bin\ffmpeg.exe"
-
-    # FFmpeg command to trim and concatenate the segments
+    ffmpeg_path = r"C:\\ProgramData\\chocolatey\\bin\\ffmpeg.exe"
+    
     command = [
         ffmpeg_path,
-        '-i', input_file,  # Input video file
-        '-filter_complex', filter_complex,  # Complex filter for trimming and concatenation
-        '-map', '[outv]',  # Map the final video stream
-        '-map', '[outa]',  # Map the final audio stream
-        '-c:v', 'libx264',  # Video codec
-        '-c:a', 'aac',  # Audio codec
-        '-y',  # Overwrite output file if exists
-        final_output  # Final output file
+        '-i', input_file,
+        '-filter_complex', filter_complex,
+        '-map', '[outv]',
+        '-map', '[outa]',
+        '-c:v', 'libx264',
+        '-c:a', 'aac',
+        '-y',
+        final_output
     ]
     
-    # Run the FFmpeg command
     try:
+        print("Running FFmpeg command...")
+        process_start_time = time.time()
         subprocess.run(command, check=True)
+        process_end_time = time.time()
         print(f"Successfully created the final concatenated video: {final_output}")
+        print(f"FFmpeg execution time: {process_end_time - process_start_time:.2f} seconds")
     except subprocess.CalledProcessError as e:
         print(f"Error occurred while processing the video: {e}")
+    
+    end_time = time.time()
+    print(f"Total processing time: {end_time - start_time:.2f} seconds")
 
 # Usage
-input_video = "input_video.mp4"  # Path to the input video
-timestamps_file = "high_sentiment.txt"  # Path to the file containing timestamps
-output_folder = "output_segments"  # Folder to save the output segments
+input_video = "input_video.mp4"
+timestamps_file = "high_sentiment.txt"
+output_folder = "output_segments"
 
-# Call the trim_video function
 trim_video(input_video, timestamps_file, output_folder)
