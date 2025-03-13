@@ -1,12 +1,11 @@
 from passlib.context import CryptContext
-import random
-import string
 from transformers import pipeline
 import re
 import subprocess
 import os
 import time
 from datetime import datetime, timedelta
+import uuid
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -215,7 +214,9 @@ def create_clips(input_file, timestamps_file, output_folder):
     ffmpeg_path = r"C:\\ProgramData\\chocolatey\\bin\\ffmpeg.exe"
 
     for idx, (start, end) in enumerate(timestamps):
-        output_file = os.path.join(output_folder, f"segment_{idx+1}.mp4")
+        segment_uuid = uuid.uuid4()  # Generate unique filename
+        output_file = os.path.join(output_folder, f"{segment_uuid}.mp4")
+
         command = [
             ffmpeg_path,
             '-i', input_file,

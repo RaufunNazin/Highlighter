@@ -17,6 +17,7 @@ class EditHistory(BaseModel) :
 class Segments(BaseModel) :
     user_id : int
     segment : str
+    video : str
      
 class ResponseUser(BaseModel) :
     id : int

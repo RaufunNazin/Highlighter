@@ -15,10 +15,10 @@ class User(Base) :
 class EditHistory(Base):
     __tablename__ = "edit_history"
     id = Column(Integer, primary_key=True, nullable=False)
-    inputVideo = Column(String(100), nullable=False)
-    outputVideo = Column(String(100), nullable=False)
-    subtitle = Column(String(100), nullable=False)
-    time = Column(String(100), nullable=False)
+    inputVideo = Column(String(255), nullable=False)
+    outputVideo = Column(String(255), nullable=True, default=None)
+    subtitle = Column(String(255), nullable=False)
+    time = Column(String(100), nullable=True, default=None)
     user_id = Column(Integer, ForeignKey("users.id"))
     user = relationship("User", back_populates="editHistory")
     
@@ -26,5 +26,6 @@ class Segments(Base):
     __tablename__ = "segments"
     id = Column(Integer, primary_key=True, nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"))
-    segment = Column(String(100), nullable=False)
+    segment = Column(String(255), nullable=False)
+    video = Column(String(255), nullable=False)
     user = relationship("User", back_populates="segments")
