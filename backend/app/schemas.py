@@ -13,6 +13,10 @@ class EditHistory(BaseModel) :
     outputVideo : str
     subtitle : str
     time: str
+    
+class Segments(BaseModel) :
+    user_id : int
+    segment : str
      
 class ResponseUser(BaseModel) :
     id : int

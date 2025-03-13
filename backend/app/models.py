@@ -10,6 +10,7 @@ class User(Base) :
     password = Column(String(100), nullable=False)
     role = Column(Integer, nullable=False)
     editHistory = relationship("EditHistory", back_populates="user")
+    segments = relationship("Segments", back_populates="user")
     
 class EditHistory(Base):
     __tablename__ = "edit_history"
@@ -20,3 +21,10 @@ class EditHistory(Base):
     time = Column(String(100), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"))
     user = relationship("User", back_populates="editHistory")
+    
+class Segments(Base):
+    __tablename__ = "segments"
+    id = Column(Integer, primary_key=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    segment = Column(String(100), nullable=False)
+    user = relationship("User", back_populates="segments")

@@ -1,7 +1,6 @@
 from passlib.context import CryptContext
 import random
 import string
-import shutil
 from transformers import pipeline
 import re
 import subprocess
@@ -13,10 +12,6 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password, hashed_password) :
     return pwd_context.verify(plain_password, hashed_password)
-
-# generate random string of length 10
-def random_string() :
-    return ''.join(random.choices(string.ascii_letters + string.digits, k=32))
 
 EXCITING_KEYWORDS = {
         "goal", "scored", "winning", "champion", "shoot", "shot", "attack", "dribble", "tackle",  
@@ -192,6 +187,60 @@ def convert_to_seconds(timestamp):
         return total_seconds
     else:
         raise ValueError(f"Invalid timestamp format: {timestamp}")
+    
+def create_clips(input_file, timestamps_file, output_folder):
+    start_time = time.time()
+    print("Starting video processing...")
+
+    os.makedirs(output_folder, exist_ok=True)
+
+    timestamps = []
+    with open(timestamps_file, 'r') as f:
+        for line in f:
+            parts = line.strip().split(',')
+            if len(parts) < 4:
+                print(f"Skipping invalid line: {line.strip()}")
+                continue  
+            
+            start = ','.join(parts[:2])  
+            end = ','.join(parts[2:])    
+
+            start_seconds = convert_to_seconds(start)
+            end_seconds = convert_to_seconds(end)
+            timestamps.append((start_seconds, end_seconds))
+
+    print(f"Parsed timestamps: {timestamps}")
+
+    segment_paths = []  
+    ffmpeg_path = r"C:\\ProgramData\\chocolatey\\bin\\ffmpeg.exe"
+
+    for idx, (start, end) in enumerate(timestamps):
+        output_file = os.path.join(output_folder, f"segment_{idx+1}.mp4")
+        command = [
+            ffmpeg_path,
+            '-i', input_file,
+            '-ss', str(start),
+            '-to', str(end),
+            '-c:v', 'libx264',
+            '-c:a', 'aac',
+            '-y', output_file
+        ]
+        
+        try:
+            print(f"Creating segment {idx+1}: {start}s to {end}s")
+            process_start_time = time.time()
+            subprocess.run(command, check=True)
+            process_end_time = time.time()
+            print(f"Segment {idx+1} created: {output_file}")
+            print(f"FFmpeg execution time: {process_end_time - process_start_time:.2f} seconds")
+            segment_paths.append(output_file)  
+        except subprocess.CalledProcessError as e:
+            print(f"Error occurred while processing segment {idx+1}: {e}")
+
+    end_time = time.time()
+    print(f"Total processing time: {end_time - start_time:.2f} seconds")
+
+    return segment_paths  # Return the list of segment files
     
 def trim_video(input_file, timestamps_file, output_folder):
     start_time = time.time()

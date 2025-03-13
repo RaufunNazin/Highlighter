@@ -13,6 +13,60 @@ def convert_to_seconds(timestamp):
         return total_seconds
     else:
         raise ValueError(f"Invalid timestamp format: {timestamp}")
+    
+def create_clips(input_file, timestamps_file, output_folder):
+    start_time = time.time()
+    print("Starting video processing...")
+
+    os.makedirs(output_folder, exist_ok=True)
+
+    timestamps = []
+    with open(timestamps_file, 'r') as f:
+        for line in f:
+            parts = line.strip().split(',')
+            if len(parts) < 4:
+                print(f"Skipping invalid line: {line.strip()}")
+                continue  
+            
+            start = ','.join(parts[:2])  
+            end = ','.join(parts[2:])    
+
+            start_seconds = convert_to_seconds(start)
+            end_seconds = convert_to_seconds(end)
+            timestamps.append((start_seconds, end_seconds))
+
+    print(f"Parsed timestamps: {timestamps}")
+
+    segment_paths = []  
+    ffmpeg_path = r"C:\\ProgramData\\chocolatey\\bin\\ffmpeg.exe"
+
+    for idx, (start, end) in enumerate(timestamps):
+        output_file = os.path.join(output_folder, f"segment_{idx+1}.mp4")
+        command = [
+            ffmpeg_path,
+            '-i', input_file,
+            '-ss', str(start),
+            '-to', str(end),
+            '-c:v', 'libx264',
+            '-c:a', 'aac',
+            '-y', output_file
+        ]
+        
+        try:
+            print(f"Creating segment {idx+1}: {start}s to {end}s")
+            process_start_time = time.time()
+            subprocess.run(command, check=True)
+            process_end_time = time.time()
+            print(f"Segment {idx+1} created: {output_file}")
+            print(f"FFmpeg execution time: {process_end_time - process_start_time:.2f} seconds")
+            segment_paths.append(output_file)  
+        except subprocess.CalledProcessError as e:
+            print(f"Error occurred while processing segment {idx+1}: {e}")
+
+    end_time = time.time()
+    print(f"Total processing time: {end_time - start_time:.2f} seconds")
+
+    return segment_paths  # Return the list of segment files
 
 def trim_video(input_file, timestamps_file, output_folder):
     start_time = time.time()
@@ -86,4 +140,6 @@ input_video = "input_video.mp4"
 timestamps_file = "high_sentiment.txt"
 output_folder = "."
 
-trim_video(input_video, timestamps_file, output_folder)
+# trim_video(input_video, timestamps_file, output_folder)
+segment_paths = create_clips(input_video, timestamps_file, output_folder)  
+print(f"Segment files created: {segment_paths}")

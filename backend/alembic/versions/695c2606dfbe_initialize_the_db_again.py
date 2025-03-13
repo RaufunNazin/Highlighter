@@ -35,7 +35,15 @@ def upgrade() -> None:
     sa.Column('user_id', sa.Integer(), sa.ForeignKey('users.id')),
     sa.PrimaryKeyConstraint('id')
     )
+    
+    op.create_table('segments',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), sa.ForeignKey('users.id')),
+    sa.Column('segment', sa.String(), nullable=False),
+    sa.PrimaryKeyConstraint('id')
+    )
 
 def downgrade() -> None:
     op.drop_table('users')
     op.drop_table('edit_history')
+    op.drop_table('segments')
