@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import List
 
 
 class User(BaseModel) :
@@ -13,6 +13,9 @@ class EditHistory(BaseModel) :
     outputVideo : str
     subtitle : str
     time: str
+    
+class TrimVideoRequest(BaseModel):
+    segment_names: List[str]
     
 class Segments(BaseModel) :
     user_id : int

@@ -6,8 +6,13 @@ from .database import engine
 from .routers import edit, user, auth, history, segment
 from dotenv import load_dotenv
 load_dotenv()
+import os
+from fastapi.responses import FileResponse
+import mimetypes
 
 models.Base.metadata.create_all(bind=engine)
+
+mimetypes.add_type("video/mp4", ".mp4")
 
 app = FastAPI()
 
@@ -30,6 +35,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/test-video")
+async def get_video():
+    video_path = f"static/6c9e4f49-9db3-4bf7-ad79-674f1b3a8c0a.mp4"
+    
+    if not os.path.exists(video_path):
+        return {"error": "File not found", "path_checked": video_path}
+
+    return FileResponse(video_path, media_type="video/mp4")
 
 app.include_router(user.router)
 app.include_router(auth.router)

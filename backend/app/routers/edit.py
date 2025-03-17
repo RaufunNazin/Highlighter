@@ -9,6 +9,7 @@ from ..oauth2 import get_current_user
 import time
 import subprocess
 import uuid
+from ..schemas import TrimVideoRequest
 
 router = APIRouter()
 
@@ -56,8 +57,14 @@ async def create_segments(video: UploadFile = File(...), subtitle: UploadFile = 
 
     # Save segment names in database
     for segment in segment_paths:
-        segment_name = f"{uuid.uuid4()}_{os.path.basename(segment)}"
-        new_segment = models.Segments(user_id=user.id, segment=segment_name, video=unique_video_filename)
+        new_filename = f"{uuid.uuid4()}_{os.path.basename(segment)}"
+        new_path = os.path.join(STATIC_DIR, new_filename)
+        
+        # Rename the file in the static directory
+        os.rename(segment, new_path)
+
+        # Save the renamed file in the database
+        new_segment = models.Segments(user_id=user.id, segment=new_filename, video=unique_video_filename)
         db.add(new_segment)
 
     # Store original files & processing time in EditHistory
@@ -83,15 +90,17 @@ async def create_segments(video: UploadFile = File(...), subtitle: UploadFile = 
 
 
 @router.post("/trim_video/", status_code=201)
-async def trim_video_api(segment_names: list, db: Session = Depends(get_db), user = Depends(get_current_user)):
+async def trim_video_api(request: TrimVideoRequest, db: Session = Depends(get_db), user = Depends(get_current_user)):
     """API to receive list of segment names, concatenate them, and return the final video."""
+    
+    segment_names = request.segment_names
 
-    # Validate that the segment names are provided
     if not segment_names:
         raise HTTPException(status_code=400, detail="No segments selected for concatenation.")
 
     # Retrieve the segments from the static folder
     segment_files = []
+    print(segment_names)
     for segment_name in segment_names:
         segment_path = os.path.join(STATIC_DIR, segment_name)
         if not os.path.exists(segment_path):
@@ -102,28 +111,34 @@ async def trim_video_api(segment_names: list, db: Session = Depends(get_db), use
     video_concat_start_time = time.time()
 
     # Create a temporary text file with the list of segment files for FFmpeg
-    concat_list_file = os.path.join(STATIC_DIR, "concat_list.txt")
-    with open(concat_list_file, "w") as f:
-        for segment_file in segment_files:
-            f.write(f"file '{segment_file}'\n")
-
-    # Output path for the final concatenated video
-    final_video_path = os.path.join(STATIC_DIR, f"final_output_{user.id}_{uuid.uuid4()}.mp4")
+    concat_list_file = os.path.join(STATIC_DIR, f"concat_list_{uuid.uuid4()}.txt")
     
-    ffmpeg_path = r"C:\\ProgramData\\chocolatey\\bin\\ffmpeg.exe"
-
-    # FFmpeg command to concatenate the video segments
-    command = [
-        ffmpeg_path, 
-        "-f", "concat", 
-        "-safe", "0", 
-        "-i", concat_list_file, 
-        "-c", "copy", 
-        "-y", final_video_path
-    ]
-
     try:
-        subprocess.run(command, check=True)
+        with open(concat_list_file, "w", encoding="utf-8") as f:
+            for segment_file in segment_files:
+                # Escape Windows paths or use forward slashes
+                f.write(f"file '{segment_file.replace('\\', '/')}'\n")
+
+        # Output path for the final concatenated video
+        final_video_path = os.path.join(STATIC_DIR, f"final_output_{user.id}_{uuid.uuid4()}.mp4")
+        
+        ffmpeg_path = r"C:\\ProgramData\\chocolatey\\bin\\ffmpeg.exe"
+
+        # FFmpeg command to concatenate the video segments
+        command = [
+            ffmpeg_path, 
+            "-f", "concat", 
+            "-safe", "0", 
+            "-i", concat_list_file, 
+            "-c", "copy", 
+            "-y", final_video_path
+        ]
+
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        if result.returncode != 0:
+            raise HTTPException(status_code=500, detail=f"FFmpeg Error: {result.stderr}")
+
         # Clean up the temporary concat list file
         os.remove(concat_list_file)
 
@@ -132,22 +147,18 @@ async def trim_video_api(segment_names: list, db: Session = Depends(get_db), use
         total_video_concat_time = video_concat_end_time - video_concat_start_time
 
         # Save the final video URL in the database
-        final_video_url = f"{os.path.basename(final_video_path)}"
+        final_video_url = os.path.basename(final_video_path)
 
         # Fetch the last uploaded video and subtitle filenames for the user
         last_edit_history = db.query(models.EditHistory).filter(models.EditHistory.user_id == user.id).order_by(models.EditHistory.id.desc()).first()
 
-        if last_edit_history:
-            input_video_filename = last_edit_history.inputVideo
-            subtitle_filename = last_edit_history.subtitle
-        else:
-            input_video_filename = "unknown_video.mp4"
-            subtitle_filename = "unknown_subtitle.srt"
+        input_video_filename = last_edit_history.inputVideo if last_edit_history else "unknown_video.mp4"
+        subtitle_filename = last_edit_history.subtitle if last_edit_history else "unknown_subtitle.srt"
 
         # Save the final concatenated video information
         new_history = models.EditHistory(
             inputVideo=input_video_filename,
-            outputVideo=os.path.basename(final_video_path),
+            outputVideo=final_video_url,
             subtitle=subtitle_filename,
             time=str(total_video_concat_time),
             user_id=user.id
@@ -164,3 +175,9 @@ async def trim_video_api(segment_names: list, db: Session = Depends(get_db), use
 
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=500, detail=f"Error occurred while concatenating videos: {e}")
+    except Exception as ex:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(ex)}")
+    finally:
+        # Ensure temp file is deleted even if an error occurs
+        if os.path.exists(concat_list_file):
+            os.remove(concat_list_file)

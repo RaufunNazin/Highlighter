@@ -192,7 +192,7 @@ const Editor = () => {
                 <div>
                   <span className="text-main">{data?.total_segments}</span>{" "}
                   Highlights Generated in{" "}
-                  <span className="text-main">{data?.total_time}</span> seconds
+                  <span className="text-main">{parseFloat(data?.total_time).toFixed(2)}</span> seconds
                 </div>
               )}
             </div>
