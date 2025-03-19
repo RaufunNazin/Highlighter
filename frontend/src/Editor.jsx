@@ -76,24 +76,20 @@ const Editor = () => {
       <ToastContainer position="top-right" autoClose={3000} hideProgressBar />
 
       {/* Navbar */}
-      <div className="flex justify-start md:justify-center w-full py-5 pl-10 md:pl-0">
-        <button
-          className="text-3xl text-main cursor-pointer"
-          onClick={() => nav("/")}
-        >
-          HighLighter
-        </button>
-        <div className="flex justify-center items-center gap-10 fixed top-6 right-10">
+      <div className="flex justify-between w-full py-5 px-4 md:px-64 bg-main shadow-md items-center">
+        <div className="text-3xl text-white cursor-pointer font-sourGummy">HighLighter</div>
+        <div className="flex justify-center items-center">
           {localStorage.getItem("token") ? (
-            <div className="flex items-center gap-5">
-              {JSON.parse(localStorage.getItem("user"))?.username || "User"}
+            <div className="flex items-center text-gray-800">
+              <div className="py-2 px-5 rounded-l-md bg-white">{JSON.parse(localStorage.getItem("user"))?.username || "User"}</div>
+              
               <button
                 onClick={() => {
                   localStorage.removeItem("token");
                   localStorage.removeItem("user");
                   nav("/login", { state: "logout" });
                 }}
-                className="text-lg text-red-700 cursor-pointer"
+                className="bg-red-700 cursor-pointer py-2 px-5 text-white rounded-r-md"
               >
                 Logout
               </button>
@@ -101,7 +97,7 @@ const Editor = () => {
           ) : (
             <button
               onClick={() => nav("/login")}
-              className="text-lg text-main cursor-pointer"
+              className="text-main cursor-pointer px-5 py-2 bg-white rounded-md"
             >
               Login
             </button>
@@ -128,7 +124,7 @@ const Editor = () => {
           <div className="flex flex-col gap-4 mt-5">
             <div className="flex flex-col justify-center items-center gap-3">
               {/* Video Upload */}
-              <label className="border-2 border-main text-main px-5 py-1 rounded-lg cursor-pointer hover:bg-opacity-80">
+              <label className="border border-gray-600 text-gray-600 px-5 py-1 rounded-lg cursor-pointer hover:bg-opacity-80">
                 {videoFileName ? videoFileName : "Select Video File"}
                 <input
                   type="file"
@@ -141,7 +137,7 @@ const Editor = () => {
 
             <div className="flex flex-col justify-center items-center gap-3">
               {/* Subtitle Upload */}
-              <label className="border-2 border-main text-main px-5 py-1 rounded-lg cursor-pointer hover:bg-opacity-80">
+              <label className="border border-gray-600 text-gray-600 px-5 py-1 rounded-lg cursor-pointer hover:bg-opacity-80">
                 {subtitleFileName ? subtitleFileName : "Select Subtitle File"}
                 <input
                   type="file"
@@ -153,7 +149,7 @@ const Editor = () => {
             </div>
             <button
               onClick={() => getSegments()}
-              className="bg-main text-white px-10 py-5 rounded-md  text-xl duration-200 transition-all cursor-pointer mt-5"
+              className="bg-main text-white px-5 md:px-10 py-3 md:py-5 rounded-md text-xl duration-200 transition-all cursor-pointer mt-5"
             >
               Generate Highlights
             </button>
