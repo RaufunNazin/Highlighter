@@ -136,7 +136,7 @@ const Landing = () => {
             </p>
             <div className="flex gap-12 pt-4">
                <div>
-                  <div className="text-3xl font-black text-primary">SQLite</div>
+                  <div className="text-3xl font-black text-primary">PostgreSQL</div>
                   <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">Data Persistence</div>
                </div>
                <div>

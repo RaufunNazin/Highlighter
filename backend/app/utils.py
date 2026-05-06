@@ -144,13 +144,18 @@ def _normalize_score(result: dict, label_type: str):
 
 # -------------------- Main Analysis --------------------
 
-def analyze_excitement(subtitles, model_key: str = "bert"):
+def analyze_excitement(subtitles, model_key: str = "bert", logger=None):
+    def log(msg):
+        print(msg)
+        if logger:
+            logger(msg)
+
     """Returns (merged_timestamps, metrics_dict)."""
     model_info = MODEL_REGISTRY.get(model_key)
     if model_info is None:
         raise ValueError(f"Unknown model key '{model_key}'. Choose from: {list(MODEL_REGISTRY.keys())}")
 
-    print(f"\nLoading model: {model_info['name']} ...")
+    log(f"\nLoading model: {model_info['name']} ...")
     model_load_start = time.time()
     sentiment_pipeline = pipeline(
         model_info["task"],
@@ -159,13 +164,13 @@ def analyze_excitement(subtitles, model_key: str = "bert"):
         max_length=512,
     )
     model_load_time = time.time() - model_load_start
-    print(f"Model loaded. ({model_load_time:.2f}s)")
+    log(f"Model loaded. ({model_load_time:.2f}s)")
 
     exciting_timestamps = []
     confidence_scores = []
     highlights_found = 0
 
-    print("\nAnalyzing subtitles...")
+    log("\nAnalyzing subtitles...")
     analysis_start = time.time()
 
     for i, subtitle in enumerate(subtitles):
@@ -195,7 +200,7 @@ def analyze_excitement(subtitles, model_key: str = "bert"):
             highlights_found += 1
 
         if i % 10 == 0:
-            print(f"Processed {i+1}/{len(subtitles)} subtitles...")
+            log(f"Processed {i+1}/{len(subtitles)} subtitles...")
 
     analysis_time = time.time() - analysis_start
     avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0
@@ -211,7 +216,7 @@ def analyze_excitement(subtitles, model_key: str = "bert"):
         "avg_confidence": round(avg_confidence, 4),
     }
 
-    print(f"Done. Highlights: {highlights_found} | Time: {analysis_time:.2f}s | Avg conf: {avg_confidence:.4f}")
+    log(f"Done. Highlights: {highlights_found} | Time: {analysis_time:.2f}s | Avg conf: {avg_confidence:.4f}")
     merged = merge_overlapping_timestamps(exciting_timestamps)
     return merged, metrics
 
@@ -262,7 +267,11 @@ def convert_to_seconds(timestamp):
     raise ValueError(f"Invalid timestamp format: {timestamp}")
 
 
-def create_clips(input_file, timestamps_file, output_folder):
+def create_clips(input_file, timestamps_file, output_folder, logger=None):
+    def log(msg):
+        print(msg)
+        if logger:
+            logger(msg)
     start_time = time.time()
     os.makedirs(output_folder, exist_ok=True)
     timestamps = []
@@ -277,17 +286,44 @@ def create_clips(input_file, timestamps_file, output_folder):
 
     segment_paths = []
     ffmpeg_path = "ffmpeg"
+    log(f"Starting segment extraction. Total segments: {len(timestamps)}")
+    
     for idx, (start, end) in enumerate(timestamps):
         output_file = os.path.join(output_folder, f"{uuid.uuid4()}.mp4")
         command = [ffmpeg_path, "-i", input_file, "-ss", str(start), "-to", str(end),
                    "-c:v", "libx264", "-c:a", "aac", "-y", output_file]
+        
+        log(f"\n[FFMPEG] Processing Segment {idx+1}/{len(timestamps)}: {start}s -> {end}s")
+        
         try:
-            subprocess.run(command, check=True)
-            segment_paths.append(output_file)
-        except subprocess.CalledProcessError as e:
-            print(f"Error on segment {idx+1}: {e}")
+            # We use stderr=subprocess.STDOUT because FFmpeg writes progress/logs to stderr
+            process = subprocess.Popen(
+                command, 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.STDOUT, 
+                text=True,
+                bufsize=1,
+                universal_newlines=True
+            )
+            
+            # Stream the output line by line
+            for line in process.stdout:
+                line = line.strip()
+                if line:
+                    log(f"  > {line}")
+            
+            process.wait()
+            
+            if process.returncode == 0:
+                segment_paths.append(output_file)
+                log(f"[FFMPEG] Segment {idx+1} complete.")
+            else:
+                log(f"[FFMPEG] Error: Segment {idx+1} failed with return code {process.returncode}")
+                
+        except Exception as e:
+            log(f"[FFMPEG] Critical Error on segment {idx+1}: {str(e)}")
 
-    print(f"Total processing time: {time.time()-start_time:.2f}s")
+    log(f"\nTotal extraction time: {time.time()-start_time:.2f}s")
     return segment_paths
 
 

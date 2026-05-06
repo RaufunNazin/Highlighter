@@ -1,0 +1,41 @@
+Improving a video highlight system involves moving from simple text-based triggers to a multi-modal "understanding" of the footage. 
+
+Here is a structured plan to take your backend and analysis system to a production-grade, high-accuracy level.
+
+# 🚀 Enhancement Implementation Plan
+
+## 1. Architectural Scaling (Reliability)
+Currently, your backend processes videos in "real-time" within the API lifecycle. If a video is 1 hour long, the connection might time out or crash.
+*   **Asynchronous Task Queue**: Integrate **Celery with Redis**. The API should just say "Accepted," and a worker container handles the heavy lifting.
+*   **Task Status Persistence**: Store the status (Pending, Processing, Failed, Success) in the database so users can leave and come back later to see their highlights.
+
+## 2. Multi-Modal Analysis (Accuracy)
+Text sentiment from subtitles only tells half the story. To find truly "exciting" moments, you should analyze other data streams:
+*   **Audio Peak Detection**: Analyze the audio track for spikes in volume (crowd cheers, commentator excitement) which often correlate with highlights.
+*   **Whisper for Better Transcripts**: Instead of relying on provided `.srt` files, use **OpenAI Whisper** to generate high-accuracy transcripts with precise timestamps.
+*   **Visual Cue Detection**: Use a lightweight Computer Vision model to detect scoreboard changes, fast motion, or specific "celebration" visual patterns.
+*   **Ensemble Scoring**: Create a "Highlight Score" (0.0 - 1.0) by averaging:
+    *   `Sentiment Score` (NLP)
+    *   `Volume Score` (Audio)
+    *   `Keyword Weight` (Text)
+
+## 3. Video Processing Optimization (Performance)
+*   **GPU Acceleration**: Update the `backend/Dockerfile` and `utils.py` to use `h264_nvenc` (NVIDIA) or `h264_vaapi` (Intel) to make FFmpeg clipping 5-10x faster.
+*   **Parallel Clipping**: Instead of clipping one segment at a time in a loop, run multiple FFmpeg processes in parallel.
+*   **Stream Copying**: Use `-c copy` where possible to avoid re-encoding the video, which is nearly instantaneous.
+
+## 4. Storage & Scalability
+*   **Object Storage**: Move away from the local `static/` folder to **MinIO** or **AWS S3**. This prevents your Docker container from bloating and allows you to scale to multiple backend workers.
+*   **Automatic Cleanup**: Implement a TTL (Time-To-Live) for processed videos so old highlights are automatically deleted after 24 hours to save disk space.
+
+## 5. UI/UX "Pro" Features
+*   **Interactive Timeline**: Show the sentiment "heatmap" across the entire video so users can see where the most exciting parts are.
+*   **Manual Adjustment**: Allow users to drag the start/end points of a detected highlight before finalizing the trim.
+
+---
+
+### Which area should we tackle first?
+> [!TIP]
+> I recommend starting with **Audio Peak Detection** or **Whisper Integration**, as these provide the biggest "wow" factor in highlight accuracy for sports and gaming content. 
+
+**Let me know which of these interests you most, and I can start writing the code!**

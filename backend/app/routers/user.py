@@ -32,6 +32,8 @@ def create_user(user : User ,db : Session = Depends(get_db)) :
 @router.get("/me", response_model=ResponseUser, tags=['user'])
 def get_info(db: Session = Depends(get_db), user = Depends(oauth2.get_current_user)):
     user_from_db = db.query(models.User).filter(models.User.id == user.id).first()
+    if not user_from_db:
+        raise HTTPException(status_code=401, detail="User not found. Please log in again.")
     return user_from_db
 
 @router.get("/users", tags=['user'])

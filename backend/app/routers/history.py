@@ -60,3 +60,43 @@ def get_analytics(db: Session = Depends(get_db), user = Depends(get_current_user
         models.EditHistory.model_key.isnot(None)
     ).all()
     return analytics
+
+# get detailed run history with segments for the current user
+@router.get("/my-runs", tags=['edit'], status_code=200)
+def get_my_runs(db: Session = Depends(get_db), user = Depends(get_current_user)):
+    """Return all edit runs for the current user, including associated segments and metrics."""
+    runs = (
+        db.query(models.EditHistory)
+        .filter(
+            models.EditHistory.user_id == user.id,
+            models.EditHistory.model_key.isnot(None),
+        )
+        .order_by(models.EditHistory.id.desc())
+        .all()
+    )
+
+    results = []
+    for run in runs:
+        # Find segments associated with this run's input video
+        segments = (
+            db.query(models.Segments)
+            .filter(
+                models.Segments.user_id == user.id,
+                models.Segments.video == run.inputVideo,
+            )
+            .all()
+        )
+        results.append({
+            "id": run.id,
+            "inputVideo": run.inputVideo,
+            "outputVideo": run.outputVideo,
+            "subtitle": run.subtitle,
+            "model_key": run.model_key,
+            "analysis_time": run.analysis_time,
+            "model_load_time": run.model_load_time,
+            "highlights_found": run.highlights_found,
+            "avg_confidence": run.avg_confidence,
+            "segments": [{"id": s.id, "segment": s.segment} for s in segments],
+        })
+
+    return results

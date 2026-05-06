@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:15
+    container_name: highlighter_db
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: highlighter
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build: ./backend
+    container_name: highlighter_backend
+    restart: always
+    environment:
+      - DB_URL=postgresql://user:password@db:5432/highlighter
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/static:/app/static
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    container_name: highlighter_frontend
+    restart: always
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
