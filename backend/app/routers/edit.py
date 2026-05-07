@@ -15,6 +15,7 @@ import json
 import asyncio
 from ..tasks import process_video_task
 from celery.result import AsyncResult
+from ..celery_app import celery_app
 
 router = APIRouter()
 
@@ -143,12 +144,10 @@ async def process_async(
 
     # Start Celery task
     task = process_video_task.delay(
-        video_path, 
-        subtitle_path, 
-        model_key, 
-        user.id, 
         unique_video_filename, 
-        unique_subtitle_filename
+        unique_subtitle_filename, 
+        model_key, 
+        user.id
     )
 
     # Save to database
@@ -178,7 +177,7 @@ def get_job_status(job_id: str, db: Session = Depends(get_db), user=Depends(get_
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
         
-    task_result = AsyncResult(job_id)
+    task_result = AsyncResult(job_id, app=celery_app)
     logs = []
     
     if task_result.state == 'PROCESSING':
@@ -201,6 +200,22 @@ def get_job_status(job_id: str, db: Session = Depends(get_db), user=Depends(get_
         "error_message": job.error_message,
         "logs": logs
     }
+
+@router.delete("/jobs/{job_id}", status_code=200)
+def delete_job(job_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Cancel and delete a job"""
+    job = db.query(models.ProcessingJob).filter(models.ProcessingJob.id == job_id, models.ProcessingJob.user_id == user.id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Revoke the celery task
+    celery_app.control.revoke(job_id, terminate=True)
+    
+    # Delete from database
+    db.delete(job)
+    db.commit()
+    
+    return {"message": "Job deleted successfully"}
 
 @router.websocket("/ws/analyze")
 async def websocket_analyze(websocket: WebSocket, db: Session = Depends(get_db)):

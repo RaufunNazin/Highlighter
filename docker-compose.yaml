@@ -16,8 +16,9 @@ services:
     build: ./backend
     container_name: highlighter_backend
     restart: always
+    env_file:
+      - ./backend/.env
     environment:
-      - DB_URL=postgresql://user:password@db:5432/highlighter
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     ports:
@@ -32,8 +33,9 @@ services:
     build: ./backend
     container_name: highlighter_celery_worker
     restart: always
+    env_file:
+      - ./backend/.env
     environment:
-      - DB_URL=postgresql://user:password@db:5432/highlighter
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:

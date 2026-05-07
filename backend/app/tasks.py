@@ -10,9 +10,13 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "..", "static")
 
 @celery_app.task(bind=True, name="app.tasks.process_video_task")
-def process_video_task(self, video_path: str, subtitle_path: str, model_key: str, user_id: int, unique_video_filename: str, unique_subtitle_filename: str):
+def process_video_task(self, video_filename: str, subtitle_filename: str, model_key: str, user_id: int):
     task_id = self.request.id
     db = SessionLocal()
+    job = None
+    
+    video_path = os.path.join(STATIC_DIR, video_filename)
+    subtitle_path = os.path.join(STATIC_DIR, subtitle_filename)
     
     try:
         # Update job status to processing
@@ -52,12 +56,12 @@ def process_video_task(self, video_path: str, subtitle_path: str, model_key: str
             new_filename = f"{uuid.uuid4()}_{os.path.basename(segment)}"
             new_path = os.path.join(STATIC_DIR, new_filename)
             os.rename(segment, new_path)
-            new_segment = models.Segments(user_id=user_id, segment=new_filename, video=unique_video_filename)
+            new_segment = models.Segments(user_id=user_id, segment=new_filename, video=video_filename)
             db.add(new_segment)
 
         new_history = models.EditHistory(
-            inputVideo=unique_video_filename,
-            subtitle=unique_subtitle_filename,
+            inputVideo=video_filename,
+            subtitle=subtitle_filename,
             user_id=user_id,
             model_key=model_key,
             analysis_time=metrics["analysis_time"],
@@ -74,7 +78,7 @@ def process_video_task(self, video_path: str, subtitle_path: str, model_key: str
         db.commit()
         sync_logger("All processing completed successfully!")
         
-        return {"status": "success", "video_url": unique_video_filename, "metrics": metrics}
+        return {"status": "success", "video_url": video_filename, "metrics": metrics}
 
     except Exception as e:
         import traceback
@@ -84,7 +88,6 @@ def process_video_task(self, video_path: str, subtitle_path: str, model_key: str
             job.error_message = str(e)
             job.completed_at = str(datetime.utcnow())
             db.commit()
-        self.update_state(state='FAILURE', meta={'error': str(e)})
         raise e
     finally:
         db.close()

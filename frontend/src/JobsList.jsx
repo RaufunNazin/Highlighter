@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "./api";
-import { FiServer, FiActivity, FiCheckCircle, FiAlertTriangle, FiClock, FiVideo } from "react-icons/fi";
+import { FiServer, FiActivity, FiCheckCircle, FiAlertTriangle, FiClock, FiVideo, FiTrash2 } from "react-icons/fi";
 
 const JobsList = () => {
   const [jobs, setJobs] = useState([]);
@@ -26,6 +26,21 @@ const JobsList = () => {
       setLoading(false);
     }
   };
+
+  const handleDelete = async (e, jobId) => {
+    e.stopPropagation(); // prevent navigation
+    if (!window.confirm("Are you sure you want to cancel and delete this job?")) return;
+    try {
+      await api.delete(`/jobs/${jobId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      setJobs(jobs.filter(j => j.id !== jobId));
+    } catch (err) {
+      console.error("Failed to delete job", err);
+      alert("Failed to delete job");
+    }
+  };
+
 
   if (loading) return <div className="flex justify-center py-20"><FiActivity className="animate-spin text-primary text-4xl" /></div>;
 
@@ -78,8 +93,17 @@ const JobsList = () => {
                   }`}>
                     {job.status}
                   </span>
+                  
+                  <button 
+                    onClick={(e) => handleDelete(e, job.id)}
+                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                    title="Cancel & Delete Job"
+                  >
+                    <FiTrash2 />
+                  </button>
                   <span className="text-slate-300 group-hover:text-primary transition-colors">→</span>
                 </div>
+
               </div>
             ))}
           </div>

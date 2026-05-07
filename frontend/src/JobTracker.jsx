@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "./api";
-import { FiActivity, FiCpu, FiCheckCircle, FiAlertTriangle, FiArrowLeft, FiServer } from "react-icons/fi";
+import { FiActivity, FiCpu, FiCheckCircle, FiAlertTriangle, FiArrowLeft, FiServer, FiTrash2 } from "react-icons/fi";
 import { toast } from "react-toastify";
 
 const JobTracker = () => {
@@ -44,6 +44,20 @@ const JobTracker = () => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to cancel and completely delete this job?")) return;
+    try {
+      await api.delete(`/jobs/${jobId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      toast.success("Job completely cancelled and removed.");
+      nav("/jobs");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete job");
+    }
+  };
+
   useEffect(() => {
     if (logEndRef.current) {
       logEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -73,16 +87,24 @@ const JobTracker = () => {
 
   return (
     <div className="max-w-5xl mx-auto space-y-12">
-      <div className="flex items-center gap-4 border-b border-slate-200 pb-8">
-        <button onClick={() => nav("/editor")} className="p-3 bg-white hover:bg-slate-50 text-slate-500 rounded-xl border border-slate-200 transition-colors">
-          <FiArrowLeft size={20} />
-        </button>
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 flex items-center gap-3">
-            <FiServer className="text-primary" /> Active Process Tracker
-          </h1>
-          <p className="text-slate-500 font-mono text-xs mt-1">JOB ID: {jobId}</p>
+      <div className="flex items-center justify-between border-b border-slate-200 pb-8">
+        <div className="flex items-center gap-4">
+          <button onClick={() => nav("/editor")} className="p-3 bg-white hover:bg-slate-50 text-slate-500 rounded-xl border border-slate-200 transition-colors">
+            <FiArrowLeft size={20} />
+          </button>
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 flex items-center gap-3">
+              <FiServer className="text-primary" /> Active Process Tracker
+            </h1>
+            <p className="text-slate-500 font-mono text-xs mt-1">JOB ID: {jobId}</p>
+          </div>
         </div>
+        <button 
+          onClick={handleDelete}
+          className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl transition-colors border border-red-100"
+        >
+          <FiTrash2 size={18} /> Cancel & Delete
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
