@@ -13,6 +13,8 @@ from ..schemas import TrimVideoRequest
 from fastapi import WebSocket, WebSocketDisconnect
 import json
 import asyncio
+from ..tasks import process_video_task
+from celery.result import AsyncResult
 
 router = APIRouter()
 
@@ -108,13 +110,24 @@ async def create_segments(
     }
 
 
-@router.post("/upload_assets/", status_code=200)
-async def upload_assets(
+@router.post("/process_async/", status_code=202)
+async def process_async(
     video: UploadFile = File(...),
     subtitle: UploadFile = File(...),
+    model_key: str = Form(default="bert"),
+    db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """Upload video and subtitle, return unique paths for WebSocket analysis."""
+    """Start asynchronous video processing task"""
+    if model_key not in MODEL_REGISTRY:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown model '{model_key}'. Available: {list(MODEL_REGISTRY.keys())}",
+        )
+
+    if not subtitle.filename.endswith(".srt"):
+        raise HTTPException(status_code=400, detail="Only .srt subtitle files are supported.")
+
     unique_video_filename = f"{uuid.uuid4()}_{video.filename}"
     unique_subtitle_filename = f"{uuid.uuid4()}_{subtitle.filename}"
 
@@ -128,16 +141,70 @@ async def upload_assets(
     with open(subtitle_path, "wb") as f:
         shutil.copyfileobj(subtitle.file, f)
 
-    return {
-        "video_path": video_path,
-        "subtitle_path": subtitle_path,
-        "video_filename": unique_video_filename,
-        "subtitle_filename": unique_subtitle_filename,
-    }
+    # Start Celery task
+    task = process_video_task.delay(
+        video_path, 
+        subtitle_path, 
+        model_key, 
+        user.id, 
+        unique_video_filename, 
+        unique_subtitle_filename
+    )
 
+    # Save to database
+    new_job = models.ProcessingJob(
+        id=task.id,
+        user_id=user.id,
+        status="pending",
+        video_filename=unique_video_filename,
+        subtitle_filename=unique_subtitle_filename,
+        model_key=model_key
+    )
+    db.add(new_job)
+    db.commit()
+
+    return {"message": "Task submitted", "job_id": task.id}
+
+@router.get("/jobs/", status_code=200)
+def get_user_jobs(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Get all processing jobs for the current user"""
+    jobs = db.query(models.ProcessingJob).filter(models.ProcessingJob.user_id == user.id).order_by(models.ProcessingJob.created_at.desc()).all()
+    return jobs
+
+@router.get("/jobs/{job_id}", status_code=200)
+def get_job_status(job_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Get status and logs for a specific job"""
+    job = db.query(models.ProcessingJob).filter(models.ProcessingJob.id == job_id, models.ProcessingJob.user_id == user.id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    task_result = AsyncResult(job_id)
+    logs = []
+    
+    if task_result.state == 'PROCESSING':
+        info = task_result.info
+        if isinstance(info, dict):
+            logs = info.get('logs', [])
+    elif task_result.state == 'FAILURE':
+        info = task_result.info
+        logs = [f"Error: {str(info)}"]
+    elif task_result.state == 'SUCCESS':
+        logs = ["Task completed successfully."]
+        
+    return {
+        "job_id": job.id,
+        "status": job.status,
+        "model_key": job.model_key,
+        "video_filename": job.video_filename,
+        "created_at": job.created_at,
+        "completed_at": job.completed_at,
+        "error_message": job.error_message,
+        "logs": logs
+    }
 
 @router.websocket("/ws/analyze")
 async def websocket_analyze(websocket: WebSocket, db: Session = Depends(get_db)):
+    # Kept for backward compatibility, but effectively deprecated
     await websocket.accept()
     try:
         # 1. Receive Initial Config

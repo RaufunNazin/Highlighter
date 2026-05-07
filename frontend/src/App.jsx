@@ -7,6 +7,8 @@ import Login from "./Login";
 import Register from "./Register";
 import Highlights from "./Highlights";
 import ModelComparison from "./ModelComparison";
+import JobTracker from "./JobTracker";
+import JobsList from "./JobsList";
 
 import Layout from "./Layout";
 
@@ -26,6 +28,14 @@ const router = createBrowserRouter([
   {
     path: "/compare",
     element: <Layout><ModelComparison /></Layout>,
+  },
+  {
+    path: "/jobs",
+    element: <Layout><JobsList /></Layout>,
+  },
+  {
+    path: "/jobs/:jobId",
+    element: <Layout><JobTracker /></Layout>,
   },
   {
     path: "/login",

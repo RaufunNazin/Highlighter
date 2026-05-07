@@ -1,6 +1,24 @@
 from .database import Base
 from sqlalchemy import Integer, String, Column, ForeignKey, Float
 from sqlalchemy.orm import relationship
+from datetime import datetime
+
+class ProcessingJob(Base):
+    __tablename__ = "processing_jobs"
+    id = Column(String(50), primary_key=True, nullable=False) # celery task id
+    user_id = Column(Integer, ForeignKey("users.id"))
+    status = Column(String(50), nullable=False, default="pending") # pending, processing, completed, failed
+    video_filename = Column(String(255), nullable=True)
+    subtitle_filename = Column(String(255), nullable=True)
+    model_key = Column(String(50), nullable=True)
+    created_at = Column(String(50), nullable=True, default=lambda: str(datetime.utcnow()))
+    completed_at = Column(String(50), nullable=True)
+    error_message = Column(String(1000), nullable=True)
+    
+    # We can store live logs as a JSON array or just fetch them from Redis/Celery if we want.
+    # For now, we'll keep it simple and just rely on status.
+    
+    user = relationship("User")
 
 class User(Base):
     __tablename__ = "users"

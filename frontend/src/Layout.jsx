@@ -36,6 +36,7 @@ const Layout = ({ children }) => {
           <nav className="hidden md:flex items-center gap-6">
             <Link to="/" className={`text-sm font-medium transition-colors ${location.pathname === "/" ? "text-primary" : "text-slate-500 hover:text-slate-900"}`}>Home</Link>
             <Link to="/editor" className={`text-sm font-medium transition-colors ${location.pathname === "/editor" ? "text-primary" : "text-slate-500 hover:text-slate-900"}`}>Editor</Link>
+            <Link to="/jobs" className={`text-sm font-medium transition-colors ${location.pathname === "/jobs" ? "text-primary" : "text-slate-500 hover:text-slate-900"}`}>Active Jobs</Link>
             <Link to="/compare" className={`text-sm font-medium transition-colors ${location.pathname === "/compare" ? "text-primary" : "text-slate-500 hover:text-slate-900"}`}>Analytics</Link>
           </nav>
 
@@ -91,6 +92,7 @@ const Layout = ({ children }) => {
               <h4 className="font-bold text-slate-900 mb-6 text-sm uppercase tracking-widest">Platform</h4>
               <ul className="space-y-3 text-sm text-slate-500">
                 <li onClick={() => navigate("/editor")} className="hover:text-primary cursor-pointer transition-colors">Video Editor</li>
+                <li onClick={() => navigate("/jobs")} className="hover:text-primary cursor-pointer transition-colors">Job Tracker</li>
                 <li onClick={() => navigate("/compare")} className="hover:text-primary cursor-pointer transition-colors">Model Comparison</li>
                 <li className="hover:text-primary cursor-pointer transition-colors">Documentation</li>
               </ul>

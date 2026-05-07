@@ -96,65 +96,25 @@ const Editor = () => {
       });
       const userId = userRes.data.id;
 
-      // 2. Upload Assets
+      // 2. Upload Assets & Start Async Process
       const formData = new FormData();
       formData.append("video", video);
       formData.append("subtitle", subtitle);
+      formData.append("model_key", selectedModel);
       
-      const uploadRes = await api.post("/upload_assets/", formData, {
+      const uploadRes = await api.post("/process_async/", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
 
-      setLogs(prev => [...prev, "[SYSTEM] Assets uploaded. Opening Neural Stream..."]);
+      setLogs(prev => [...prev, "[SYSTEM] Task submitted. Redirecting to job tracker..."]);
       setCurrentStep(1);
 
-      // 3. Connect WebSocket
-      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsHost = window.location.hostname === "localhost" ? "localhost:8000" : window.location.host;
-      const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/analyze`);
-
-      ws.onopen = () => {
-        ws.send(JSON.stringify({
-          video_path: uploadRes.data.video_path,
-          subtitle_path: uploadRes.data.subtitle_path,
-          video_filename: uploadRes.data.video_filename,
-          subtitle_filename: uploadRes.data.subtitle_filename,
-          model_key: selectedModel,
-          user_id: userId
-        }));
-      };
-
-      ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.type === "log") {
-          setLogs(prev => [...prev, data.message]);
-          
-          // Determine step based on log message
-          if (data.message.includes("Starting sentiment analysis")) setCurrentStep(2);
-          if (data.message.includes("Generating video segments") || data.message.includes("Starting segment extraction")) setCurrentStep(3);
-          if (data.message.includes("Finalizing")) setCurrentStep(4);
-        } else if (data.type === "complete") {
-          localStorage.setItem("lastVideo", data.video_url);
-          finishedRef.current = true;
-          setLoading(false);
-          toast.success("Analysis complete!");
-          nav("/highlights");
-        } else if (data.type === "error") {
-
-          console.error("WS Error:", data.message);
-          toast.error(data.message);
-          setLoading(false);
-        }
-      };
-
-      ws.onerror = (err) => {
-        console.error("WS Error:", err);
-        toast.error("Stream connection failed.");
-        setLoading(false);
-      };
+      // Redirect to the Jobs page to monitor progress
+      toast.success("Processing started in the background!");
+      nav(`/jobs/${uploadRes.data.job_id}`);
 
     } catch (error) {
       console.error("Process error:", error);
