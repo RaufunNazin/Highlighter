@@ -1,5 +1,6 @@
 from fastapi import Depends, APIRouter
 from fastapi.exceptions import HTTPException
+from fastapi.responses import JSONResponse
 from ..database import get_db
 from sqlalchemy.orm import Session
 from ..schemas import User, ResponseUser, Token
@@ -12,8 +13,8 @@ router = APIRouter()
 def home():
     return {"ping": "pong"}
 
-@router.post("/register", status_code = 201, response_model = Token, tags=['user'])
-def create_user(user : User ,db : Session = Depends(get_db)) :
+@router.post("/register", status_code=201, tags=['user'])
+def create_user(user: User, db: Session = Depends(get_db)):
     # check for same email or username
     if db.query(models.User).filter(models.User.email == user.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -26,8 +27,22 @@ def create_user(user : User ,db : Session = Depends(get_db)) :
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    access_token = oauth2.create_access_token({ "id": new_user.id, "email": new_user.email })
-    return {"access_token": access_token, "token_type": "Bearer" }
+    access_token = oauth2.create_access_token({"id": new_user.id, "email": new_user.email})
+
+    response = JSONResponse(
+        status_code=201,
+        content={"access_token": access_token, "token_type": "Bearer"},
+    )
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        samesite="lax",
+        secure=False,
+        max_age=60 * 60 * 24 * 7,
+        path="/",
+    )
+    return response
 
 @router.get("/me", response_model=ResponseUser, tags=['user'])
 def get_info(db: Session = Depends(get_db), user = Depends(oauth2.get_current_user)):

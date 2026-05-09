@@ -355,3 +355,71 @@ def trim_video(input_file, timestamps_file, output_folder):
     except subprocess.CalledProcessError as e:
         print(f"Error: {e}")
     print(f"Total time: {time.time()-start_time:.2f}s")
+
+
+# -------------------- New Timeline Helpers --------------------
+
+def get_video_duration(input_file: str) -> float:
+    """Return duration of video in seconds using ffprobe (no decoding)."""
+    command = [
+        "ffprobe",
+        "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        input_file,
+    ]
+    try:
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+        return float(result.stdout.strip())
+    except Exception as e:
+        print(f"[ffprobe] Could not determine duration: {e}")
+        return 0.0
+
+
+def trim_video_from_segments(input_file: str, segments: list, output_folder: str) -> str:
+    """
+    Trim and concatenate segments from the source video in a single FFmpeg pass.
+
+    Args:
+        input_file:   Absolute path to the source video.
+        segments:     List of dicts with keys ``start`` and ``end`` (floats, seconds).
+        output_folder: Directory where the final MP4 will be written.
+
+    Returns:
+        Absolute path to the produced output file.
+    """
+    if not segments:
+        raise ValueError("segments list must not be empty")
+
+    os.makedirs(output_folder, exist_ok=True)
+    t0 = time.time()
+
+    video_filters = [
+        f"[0:v]trim=start={seg['start']}:end={seg['end']},setpts=PTS-STARTPTS[v{i}]"
+        for i, seg in enumerate(segments)
+    ]
+    audio_filters = [
+        f"[0:a]atrim=start={seg['start']}:end={seg['end']},asetpts=PTS-STARTPTS[a{i}]"
+        for i, seg in enumerate(segments)
+    ]
+    n = len(segments)
+    concat_video = f"{''.join(f'[v{i}]' for i in range(n))}concat=n={n}:v=1:a=0[vout]"
+    concat_audio = f"{''.join(f'[a{i}]' for i in range(n))}concat=n={n}:v=0:a=1[aout]"
+    filter_complex = ";".join(video_filters + audio_filters + [concat_video, concat_audio])
+
+    final_output = os.path.join(output_folder, f"{uuid.uuid4()}_highlight.mp4")
+    command = [
+        "ffmpeg", "-i", input_file,
+        "-filter_complex", filter_complex,
+        "-map", "[vout]", "-map", "[aout]",
+        "-c:v", "libx264", "-c:a", "aac",
+        "-y", final_output,
+    ]
+
+    print(f"[trim_video_from_segments] FFmpeg pass for {n} segment(s)...")
+    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"FFmpeg failed:\n{result.stdout}")
+
+    print(f"[trim_video_from_segments] Done in {time.time()-t0:.2f}s → {final_output}")
+    return final_output

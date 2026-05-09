@@ -9,6 +9,7 @@ import Highlights from "./Highlights";
 import ModelComparison from "./ModelComparison";
 import JobTracker from "./JobTracker";
 import JobsList from "./JobsList";
+import TimelineEditor from "./TimelineEditor";
 
 import Layout from "./Layout";
 
@@ -36,6 +37,10 @@ const router = createBrowserRouter([
   {
     path: "/jobs/:jobId",
     element: <Layout><JobTracker /></Layout>,
+  },
+  {
+    path: "/timeline",
+    element: <Layout><TimelineEditor /></Layout>,
   },
   {
     path: "/login",

@@ -28,32 +28,23 @@ const Editor = () => {
     setLoading(true);
 
     try {
-      // 1. Fetch user info
-      const userRes = await api.get("/me", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
-      const userId = userRes.data.id;
-
-      // 2. Upload Assets & Start Async Process
       const formData = new FormData();
       formData.append("video", video);
       formData.append("subtitle", subtitle);
       formData.append("model_key", selectedModel);
-      
-      const uploadRes = await api.post("/process_async/", formData, {
+
+      const res = await api.post("/analyze_only/", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
 
-      // Redirect to the Jobs page to monitor progress
-      toast.success("Processing started in the background!");
-      nav(`/jobs/${uploadRes.data.job_id}`);
+      toast.success("Analysis complete! Opening timeline editor…");
+      nav("/timeline", { state: res.data });
 
     } catch (error) {
-      console.error("Process error:", error);
-      toast.error("Failed to process video.");
+      console.error("Analysis error:", error);
+      toast.error("Failed to analyze video.");
       setLoading(false);
     }
   };
@@ -180,7 +171,7 @@ const Editor = () => {
                disabled={!video || !subtitle || loading}
                className="btn-primary py-4 px-16 text-lg disabled:opacity-40 shadow-xl shadow-primary/20 w-full md:w-auto"
              >
-               {loading ? "Uploading..." : "Start Processing"}
+               {loading ? "Analyzing…" : "Analyze & Open Timeline"}
              </button>
           </div>
         </div>

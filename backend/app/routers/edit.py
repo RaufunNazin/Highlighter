@@ -4,12 +4,12 @@ from ..database import get_db
 from .. import models
 import shutil
 import os
-from ..utils import load_subtitles, analyze_excitement, save_timestamps, create_clips, MODEL_REGISTRY
+from ..utils import load_subtitles, analyze_excitement, save_timestamps, create_clips, MODEL_REGISTRY, get_video_duration, trim_video_from_segments
 from ..oauth2 import get_current_user
 import time
 import subprocess
 import uuid
-from ..schemas import TrimVideoRequest
+from ..schemas import TrimVideoRequest, RenderRequest, AnalyzeResponse
 from fastapi import WebSocket, WebSocketDisconnect
 import json
 import asyncio
@@ -21,6 +21,24 @@ router = APIRouter()
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_DIR = os.path.join(BASE_DIR, "..", "static")
+
+# ── Upload size limits ──
+MAX_VIDEO_SIZE = 500 * 1024 * 1024   # 500 MB
+MAX_SUBTITLE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+
+async def validate_upload_sizes(video: UploadFile, subtitle: UploadFile):
+    """Read file sizes and reject if they exceed limits. Must be called before saving."""
+    video_bytes = await video.read()
+    if len(video_bytes) > MAX_VIDEO_SIZE:
+        raise HTTPException(status_code=413, detail=f"Video file too large. Maximum allowed: {MAX_VIDEO_SIZE // (1024*1024)} MB.")
+    await video.seek(0)
+
+    subtitle_bytes = await subtitle.read()
+    if len(subtitle_bytes) > MAX_SUBTITLE_SIZE:
+        raise HTTPException(status_code=413, detail=f"Subtitle file too large. Maximum allowed: {MAX_SUBTITLE_SIZE // (1024*1024)} MB.")
+    await subtitle.seek(0)
+
 
 
 @router.get("/models/", status_code=200)
@@ -50,6 +68,8 @@ async def create_segments(
 
     if not subtitle.filename.endswith(".srt"):
         raise HTTPException(status_code=400, detail="Only .srt subtitle files are supported.")
+
+    await validate_upload_sizes(video, subtitle)
 
     unique_video_filename = f"{uuid.uuid4()}_{video.filename}"
     unique_subtitle_filename = f"{uuid.uuid4()}_{subtitle.filename}"
@@ -128,6 +148,8 @@ async def process_async(
 
     if not subtitle.filename.endswith(".srt"):
         raise HTTPException(status_code=400, detail="Only .srt subtitle files are supported.")
+
+    await validate_upload_sizes(video, subtitle)
 
     unique_video_filename = f"{uuid.uuid4()}_{video.filename}"
     unique_subtitle_filename = f"{uuid.uuid4()}_{subtitle.filename}"
@@ -410,3 +432,138 @@ async def trim_video_api(
     finally:
         if os.path.exists(concat_list_file):
             os.remove(concat_list_file)
+
+
+# ─────────────────────────────────────────────────────────────
+# NEW: Analyze-only endpoint (no FFmpeg, returns timestamps)
+# ─────────────────────────────────────────────────────────────
+
+@router.post("/analyze_only/", status_code=200)
+async def analyze_only(
+    video: UploadFile = File(...),
+    subtitle: UploadFile = File(...),
+    model_key: str = Form(default="bert"),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """
+    Upload video + subtitle, run NLP analysis, return highlight segments.
+    No FFmpeg clip generation — just timestamps + video duration.
+    """
+    if model_key not in MODEL_REGISTRY:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown model '{model_key}'. Available: {list(MODEL_REGISTRY.keys())}",
+        )
+    if not subtitle.filename.endswith(".srt"):
+        raise HTTPException(status_code=400, detail="Only .srt subtitle files are supported.")
+
+    await validate_upload_sizes(video, subtitle)
+
+    unique_video_filename = f"{uuid.uuid4()}_{video.filename}"
+    unique_subtitle_filename = f"{uuid.uuid4()}_{subtitle.filename}"
+    video_path = os.path.join(STATIC_DIR, unique_video_filename)
+    subtitle_path = os.path.join(STATIC_DIR, unique_subtitle_filename)
+    os.makedirs(STATIC_DIR, exist_ok=True)
+
+    with open(video_path, "wb") as f:
+        shutil.copyfileobj(video.file, f)
+    with open(subtitle_path, "wb") as f:
+        shutil.copyfileobj(subtitle.file, f)
+
+    subtitles = load_subtitles(subtitle_path)
+    if not subtitles:
+        raise HTTPException(status_code=400, detail="No subtitles found in file.")
+
+    loop = asyncio.get_event_loop()
+    timestamps, metrics = await loop.run_in_executor(
+        None, analyze_excitement, subtitles, model_key, None
+    )
+
+    video_duration = get_video_duration(video_path)
+
+    # Convert HH:MM:SS,ms strings to floats
+    from ..utils import convert_to_seconds
+    segments = []
+    for start_str, end_str in timestamps:
+        try:
+            segments.append({
+                "start": round(convert_to_seconds(start_str), 3),
+                "end": round(convert_to_seconds(end_str), 3),
+                "score": metrics.get("avg_confidence", 0.0),
+            })
+        except Exception:
+            pass
+
+    return {
+        "video_filename": unique_video_filename,
+        "subtitle_filename": unique_subtitle_filename,
+        "video_duration": video_duration,
+        "segments": segments,
+        "metrics": metrics,
+    }
+
+
+# ─────────────────────────────────────────────────────────────
+# NEW: Render endpoint (single FFmpeg pass on approved segments)
+# ─────────────────────────────────────────────────────────────
+
+@router.post("/render_highlights/", status_code=201)
+async def render_highlights(
+    request: RenderRequest,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """
+    Accept user-approved keep-segments and produce a single output video
+    using one FFmpeg filter-complex pass. No intermediate clips created.
+    """
+    if not request.segments:
+        raise HTTPException(status_code=400, detail="segments list must not be empty.")
+
+    # Guard against path traversal
+    safe_name = os.path.basename(request.video_filename)
+    if safe_name != request.video_filename or ".." in request.video_filename:
+        raise HTTPException(status_code=400, detail="Invalid video filename.")
+
+    video_path = os.path.join(STATIC_DIR, safe_name)
+    if not os.path.exists(video_path):
+        raise HTTPException(status_code=404, detail="Source video not found on server.")
+
+    # Sort segments by start time and clamp negatives
+    raw_segments = [
+        {"start": max(0.0, seg.start), "end": seg.end}
+        for seg in sorted(request.segments, key=lambda s: s.start)
+        if seg.end > seg.start
+    ]
+    if not raw_segments:
+        raise HTTPException(status_code=400, detail="No valid segments (end must be > start).")
+
+    loop = asyncio.get_event_loop()
+    t0 = time.time()
+    try:
+        final_path = await loop.run_in_executor(
+            None, trim_video_from_segments, video_path, raw_segments, STATIC_DIR
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    total_time = time.time() - t0
+    final_video_url = os.path.basename(final_path)
+
+    # Persist to edit history
+    new_history = models.EditHistory(
+        inputVideo=request.video_filename,
+        outputVideo=final_video_url,
+        subtitle="",
+        time=str(total_time),
+        user_id=user.id,
+    )
+    db.add(new_history)
+    db.commit()
+
+    return {
+        "message": "Render complete",
+        "final_video_url": final_video_url,
+        "total_time": total_time,
+    }

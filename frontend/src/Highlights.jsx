@@ -56,7 +56,6 @@ const Highlights = () => {
       const response = await api.post(
         "/trim_video/",
         { segment_names: selectedSegments },
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
       setFinalVideo(response.data.final_video_url);
       localStorage.setItem("finalVideo", response.data.final_video_url);

@@ -24,9 +24,7 @@ const ModelComparison = () => {
 
   const fetchAnalytics = async () => {
     try {
-      const response = await api.get("/my-runs", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
+      const response = await api.get("/my-runs");
       setRuns(response.data);
     } catch (error) {
       console.error("Failed to fetch analytics:", error);

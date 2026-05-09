@@ -25,25 +25,22 @@ const Login = () => {
       })
       .then((res) => {
         if (res.status === 200) {
-          const token = res.data.access_token;
-          localStorage.setItem("token", token);
-          
-          api.get("/me", {
-            headers: { Authorization: `Bearer ${token}` }
-          })
-          .then((response) => {
-            localStorage.setItem("user", JSON.stringify(response.data));
-            navigate("/", { state: "login" });
-          })
-          .catch((err) => {
-            console.log(err);
-            navigate("/", { state: "login" }); // Fallback navigate
-          });
+          // Cookie is set automatically by the server (httpOnly)
+          // Just fetch user profile to store display info
+          api.get("/me")
+            .then((response) => {
+              localStorage.setItem("user", JSON.stringify(response.data));
+              navigate("/", { state: "login" });
+            })
+            .catch((err) => {
+              console.log(err);
+              navigate("/", { state: "login" });
+            });
         }
       })
       .catch((err) => {
         console.log(err);
-        toast.error(err.response.data?.detail || err.message);
+        toast.error(err.response?.data?.detail || err.message);
       });
   };
 

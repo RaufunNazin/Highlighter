@@ -16,9 +16,7 @@ const JobsList = () => {
 
   const fetchJobs = async () => {
     try {
-      const res = await api.get("/jobs/", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
+      const res = await api.get("/jobs/");
       setJobs(res.data);
     } catch (err) {
       console.error(err);
@@ -31,9 +29,7 @@ const JobsList = () => {
     e.stopPropagation(); // prevent navigation
     if (!window.confirm("Are you sure you want to cancel and delete this job?")) return;
     try {
-      await api.delete(`/jobs/${jobId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
+      await api.delete(`/jobs/${jobId}`);
       setJobs(jobs.filter(j => j.id !== jobId));
     } catch (err) {
       console.error("Failed to delete job", err);

@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { FiZap, FiTarget, FiArrowRight, FiCpu } from "react-icons/fi";
+import { FiZap, FiTarget, FiArrowRight, FiCpu, FiLayers, FiSliders, FiClock, FiCheck } from "react-icons/fi";
 
 const Landing = () => {
   const nav = useNavigate();
@@ -15,140 +15,217 @@ const Landing = () => {
   }, [state]);
 
   return (
-    <div className="space-y-32">
+    <div className="space-y-24">
       <ToastContainer position="top-right" autoClose={2000} theme="light" />
-      
-      {/* Hero Section */}
-      <section className="flex flex-col lg:flex-row items-center justify-between gap-16 py-12">
+
+      {/* ═══════════ Hero ═══════════ */}
+      <section className="flex flex-col lg:flex-row items-center justify-between gap-16 py-8">
         <div className="flex-1 space-y-8 text-center lg:text-left">
-          <div className="space-y-6">
-            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-tight text-slate-900">
-              Open-Source <span className="block bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">AI Video</span> Highlighting
+          <div className="space-y-5">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/5 border border-primary/10 rounded-full text-xs font-bold text-primary uppercase tracking-wider">
+              <FiZap size={12} /> Open-Source NLP Pipeline
+            </div>
+            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-[1.1] text-slate-900">
+              Intelligent Video
+              <span className="block bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+                Highlight Extraction
+              </span>
             </h1>
-            <p className="text-lg md:text-xl text-slate-500 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-              Analyze video content through NLP processing. HighLighter allows you to select from multiple open-source sentiment models to find the most exciting moments in your footage.
+            <p className="text-base md:text-lg text-slate-500 max-w-xl mx-auto lg:mx-0 leading-relaxed">
+              Upload a video and its SRT subtitles. HighLighter runs sentiment analysis on every subtitle line using your choice of Hugging Face transformer model, identifies the most exciting moments, and lets you visually approve cuts on an interactive timeline before rendering.
             </p>
           </div>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
             <button
               onClick={() => nav("/editor")}
-              className="btn-primary py-4 px-10 flex items-center justify-center gap-3 group text-lg"
+              className="btn-primary py-3.5 px-8 flex items-center justify-center gap-2 group"
             >
-              Get Started <FiArrowRight className="group-hover:translate-x-1 transition-transform" />
+              Open Editor <FiArrowRight className="group-hover:translate-x-1 transition-transform" />
             </button>
             <button
               onClick={() => nav("/compare")}
-              className="btn-glass py-4 px-10 text-lg border-slate-200"
+              className="btn-glass py-3.5 px-8 border-slate-200"
             >
-              View Analytics
+              Model Analytics
             </button>
           </div>
         </div>
 
+        {/* Hero visual */}
         <div className="flex-1 w-full max-w-2xl relative perspective-1000 hidden lg:block">
-          <div className="absolute inset-0 bg-primary/10 blur-[120px] rounded-full" />
-          
-          {/* Tilted Mac Window */}
-          <div 
+          <div className="absolute inset-0 bg-primary/8 blur-[100px] rounded-full" />
+          <div
             className="relative transition-transform duration-700 ease-out hover:rotate-0"
-            style={{ 
-              transform: "rotateY(-15deg) rotateX(5deg) scale(1.05)",
-              transformStyle: "preserve-3d"
-            }}
+            style={{ transform: "rotateY(-12deg) rotateX(4deg) scale(1.02)", transformStyle: "preserve-3d" }}
           >
-            <div className="glass-panel overflow-hidden border-white/40 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.2)] bg-white/20 backdrop-blur-2xl">
-              {/* Mac Header */}
-              <div className="h-8 bg-white/30 border-b border-white/20 flex items-center px-4 gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-400/80"></div>
-                <div className="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                <div className="w-2.5 h-2.5 rounded-full bg-green-400/80"></div>
-                <div className="flex-1"></div>
-                <div className="w-16 h-1.5 rounded-full bg-white/20"></div>
+            <div className="glass-panel overflow-hidden border-white/40 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.15)] bg-white/25 backdrop-blur-2xl">
+              <div className="h-7 bg-white/30 border-b border-white/20 flex items-center px-3 gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-red-400/80" />
+                <div className="w-2 h-2 rounded-full bg-amber-400/80" />
+                <div className="w-2 h-2 rounded-full bg-green-400/80" />
               </div>
-              {/* Content */}
               <div className="p-1">
-                <img 
-                  src="/image.png" 
-                  alt="HighLighter Dashboard Preview" 
-                  className="w-full h-auto rounded-lg shadow-inner"
-                />
+                <img src="/image.png" alt="HighLighter Editor Preview" className="w-full h-auto rounded-lg shadow-inner" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Mobile View Hero Image (Non-tilted) */}
+        {/* Mobile hero image */}
         <div className="lg:hidden w-full max-w-md mx-auto relative">
-           <div className="glass-panel overflow-hidden border-white/40 shadow-2xl bg-white/20">
-              <div className="h-6 bg-white/30 border-b border-white/20 flex items-center px-3 gap-1">
-                <div className="w-2 h-2 rounded-full bg-red-400/80"></div>
-                <div className="w-2 h-2 rounded-full bg-amber-400/80"></div>
-                <div className="w-2 h-2 rounded-full bg-green-400/80"></div>
-              </div>
-              <img src="/image.png" alt="Preview" className="w-full h-auto" />
-           </div>
+          <div className="glass-panel overflow-hidden border-white/40 shadow-xl bg-white/20">
+            <div className="h-6 bg-white/30 border-b border-white/20 flex items-center px-3 gap-1">
+              <div className="w-2 h-2 rounded-full bg-red-400/80" />
+              <div className="w-2 h-2 rounded-full bg-amber-400/80" />
+              <div className="w-2 h-2 rounded-full bg-green-400/80" />
+            </div>
+            <img src="/image.png" alt="Preview" className="w-full h-auto" />
+          </div>
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="space-y-16">
-        <div className="text-center space-y-4">
-           <h2 className="text-3xl font-bold text-slate-900">Core Workflow</h2>
-           <p className="text-slate-500 max-w-xl mx-auto italic">Process local videos using state-of-the-art sentiment analysis models.</p>
+      {/* ═══════════ How It Works ═══════════ */}
+      <section className="space-y-12">
+        <div className="text-center space-y-3">
+          <h2 className="text-2xl md:text-3xl font-bold text-slate-900">How It Works</h2>
+          <p className="text-slate-500 max-w-lg mx-auto text-sm">Three stages, fully transparent. No black-box processing.</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
-            { 
-              title: "Sentiment Mapping", 
-              desc: "The system reads your subtitle files and maps sentiment scores to specific video timestamps.", 
-              icon: <FiZap className="text-primary" /> 
+            {
+              step: "01",
+              title: "Upload & Analyze",
+              desc: "Upload your video and SRT subtitle file. The system parses every subtitle line and runs sentiment analysis using your selected transformer model.",
+              icon: <FiCpu className="text-primary" />,
             },
-            { 
-              title: "Model Versatility", 
-              desc: "Choose between BERT, DistilBERT, or RoBERTa to find the best accuracy/speed balance for your hardware.", 
-              icon: <FiCpu className="text-accent" /> 
+            {
+              step: "02",
+              title: "Review on Timeline",
+              desc: "AI-detected highlights appear as green segments on an interactive timeline. Drag handles to resize, click to add or remove segments, and zoom in for precision.",
+              icon: <FiSliders className="text-accent" />,
             },
-            { 
-              title: "Direct Concatenation", 
-              desc: "Once you select your favorite clips, FFmpeg handles the heavy lifting of merging them into a final highlight reel.", 
-              icon: <FiTarget className="text-green-500" /> 
-            }
-          ].map((feature, i) => (
-            <div key={i} className="glass-panel p-10 space-y-6 hover:shadow-xl hover:translate-y-[-4px] transition-all duration-300 border-slate-100">
-              <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center text-3xl border border-slate-100">
-                {feature.icon}
+            {
+              step: "03",
+              title: "Export Highlight Reel",
+              desc: "Once you're satisfied, hit Export. A single FFmpeg filter-complex pass concatenates all approved segments into one MP4 — no intermediate clips needed.",
+              icon: <FiTarget className="text-green-500" />,
+            },
+          ].map((item) => (
+            <div key={item.step} className="glass-panel p-8 space-y-4 hover:shadow-lg hover:translate-y-[-2px] transition-all duration-300 border-slate-100 relative">
+              <div className="absolute top-6 right-6 text-[40px] font-black text-slate-100 leading-none select-none">{item.step}</div>
+              <div className="w-11 h-11 rounded-xl bg-white shadow-sm flex items-center justify-center text-xl border border-slate-100">
+                {item.icon}
               </div>
-              <h3 className="text-xl font-bold text-slate-900">{feature.title}</h3>
-              <p className="text-slate-500 leading-relaxed text-sm">{feature.desc}</p>
+              <h3 className="text-lg font-bold text-slate-900">{item.title}</h3>
+              <p className="text-slate-500 leading-relaxed text-sm">{item.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Technical Truth Section */}
-      <section className="glass-panel p-12 md:p-20 bg-slate-900 text-white relative overflow-hidden">
-         <div className="absolute top-0 right-0 w-96 h-96 bg-primary/20 blur-[150px] rounded-full"></div>
-         <div className="max-w-3xl space-y-8 relative z-10">
-            <h2 className="text-3xl md:text-5xl font-bold tracking-tight">Transparency in Processing</h2>
-            <p className="text-slate-400 text-lg leading-relaxed">
-              HighLighter is built on top of the <span className="text-white font-semibold">Hugging Face Transformers</span> library and <span className="text-white font-semibold">FFmpeg</span>. We provide transparent analytics for every model run so you can monitor load times, inference latency, and detection confidence directly in your dashboard.
-            </p>
-            <div className="flex gap-12 pt-4">
-               <div>
-                  <div className="text-3xl font-black text-primary">PostgreSQL</div>
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">Data Persistence</div>
-               </div>
-               <div>
-                  <div className="text-3xl font-black text-accent">React 19</div>
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">Frontend Stack</div>
-               </div>
-               <div>
-                  <div className="text-3xl font-black text-white">FastAPI</div>
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">Core API Engine</div>
-               </div>
+      {/* ═══════════ Models ═══════════ */}
+      <section className="space-y-12">
+        <div className="text-center space-y-3">
+          <h2 className="text-2xl md:text-3xl font-bold text-slate-900">Supported Models</h2>
+          <p className="text-slate-500 max-w-lg mx-auto text-sm">
+            All models are open-source, from Hugging Face. Pick the one that fits your speed/accuracy tradeoff.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { name: "BERT Multilingual", id: "nlptown/bert-base-multilingual-uncased-sentiment", trait: "Best multilingual accuracy" },
+            { name: "DistilBERT", id: "distilbert-base-uncased-finetuned-sst-2-english", trait: "40% faster, similar accuracy" },
+            { name: "ALBERT", id: "textattack/albert-base-v2-SST-2", trait: "Low memory footprint" },
+            { name: "RoBERTa", id: "cardiffnlp/twitter-roberta-base-sentiment-latest", trait: "Strong English sentiment" },
+          ].map((m) => (
+            <div key={m.name} className="glass-panel p-6 space-y-3 border-slate-100">
+              <h4 className="font-bold text-slate-900 text-sm">{m.name}</h4>
+              <p className="text-[11px] text-slate-400 font-mono break-all leading-relaxed">{m.id}</p>
+              <div className="flex items-center gap-1.5 text-xs text-green-600 font-semibold">
+                <FiCheck size={12} /> {m.trait}
+              </div>
             </div>
-         </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ═══════════ Feature Details ═══════════ */}
+      <section className="space-y-12">
+        <div className="text-center space-y-3">
+          <h2 className="text-2xl md:text-3xl font-bold text-slate-900">What You Get</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[
+            {
+              icon: <FiSliders className="text-primary" />,
+              title: "Interactive Timeline Editor",
+              desc: "A full-width zoomable timeline with drag handles, playhead sync, and minimap. Review every second before committing to a render.",
+            },
+            {
+              icon: <FiLayers className="text-accent" />,
+              title: "Audio Waveform Display",
+              desc: "WaveSurfer.js renders the audio waveform directly in the timeline, so you can visually identify speech vs silence while editing.",
+            },
+            {
+              icon: <FiClock className="text-green-500" />,
+              title: "Fast Analysis, Lazy Render",
+              desc: "Subtitle analysis completes in seconds. FFmpeg only runs once — after you approve your cuts — eliminating wasted processing time.",
+            },
+            {
+              icon: <FiZap className="text-amber-500" />,
+              title: "Transparent Metrics",
+              desc: "Every analysis run reports model load time, inference duration, subtitle count, highlight count, and average confidence score.",
+            },
+          ].map((f, i) => (
+            <div key={i} className="glass-panel p-8 flex gap-5 items-start border-slate-100 hover:shadow-lg transition-all duration-300">
+              <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-lg border border-slate-100 shrink-0">
+                {f.icon}
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-bold text-slate-900">{f.title}</h3>
+                <p className="text-slate-500 text-sm leading-relaxed">{f.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ═══════════ Tech Stack Banner ═══════════ */}
+      <section className="glass-panel p-10 md:p-16 bg-slate-900 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-primary/15 blur-[120px] rounded-full" />
+        <div className="max-w-3xl space-y-6 relative z-10">
+          <h2 className="text-2xl md:text-4xl font-bold tracking-tight">Under the Hood</h2>
+          <p className="text-slate-400 leading-relaxed">
+            HighLighter is built on <span className="text-white font-semibold">Hugging Face Transformers</span> for NLP inference
+            and <span className="text-white font-semibold">FFmpeg</span> for video processing.
+            The backend is <span className="text-white font-semibold">FastAPI</span> with <span className="text-white font-semibold">PostgreSQL</span> persistence
+            and <span className="text-white font-semibold">Celery + Redis</span> for async job processing.
+            The frontend is <span className="text-white font-semibold">React</span> with <span className="text-white font-semibold">Vite</span> and Tailwind CSS.
+          </p>
+          <div className="flex flex-wrap gap-3 pt-2">
+            {["FastAPI", "PostgreSQL", "Celery", "Redis", "React", "Vite", "Tailwind", "FFmpeg", "WaveSurfer.js"].map((t) => (
+              <span key={t} className="px-3 py-1 bg-white/10 border border-white/10 rounded-lg text-xs font-semibold text-slate-300">
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════ CTA ═══════════ */}
+      <section className="text-center space-y-6 py-4">
+        <h2 className="text-2xl md:text-3xl font-bold text-slate-900">Ready to extract highlights?</h2>
+        <p className="text-slate-500 max-w-md mx-auto text-sm">Upload your video and subtitle file to get started. The analysis is fast — you'll be on the timeline editor in seconds.</p>
+        <button
+          onClick={() => nav("/editor")}
+          className="btn-primary py-3.5 px-10 inline-flex items-center gap-2 group text-lg shadow-xl shadow-primary/20"
+        >
+          Get Started <FiArrowRight className="group-hover:translate-x-1 transition-transform" />
+        </button>
       </section>
     </div>
   );

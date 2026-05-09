@@ -26,9 +26,7 @@ const JobTracker = () => {
 
   const fetchJobStatus = async () => {
     try {
-      const res = await api.get(`/jobs/${jobId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
+      const res = await api.get(`/jobs/${jobId}`);
       setJob(res.data);
       setLoading(false);
       
@@ -47,9 +45,7 @@ const JobTracker = () => {
   const handleDelete = async () => {
     if (!window.confirm("Are you sure you want to cancel and completely delete this job?")) return;
     try {
-      await api.delete(`/jobs/${jobId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
+      await api.delete(`/jobs/${jobId}`);
       toast.success("Job completely cancelled and removed.");
       nav("/jobs");
     } catch (err) {

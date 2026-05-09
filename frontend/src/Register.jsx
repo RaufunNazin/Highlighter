@@ -32,25 +32,21 @@ const Register = () => {
       })
       .then((res) => {
         if (res.status === 201) {
-          const token = res.data.access_token;
-          localStorage.setItem("token", token);
-          
-          api.get("/me", {
-            headers: { Authorization: `Bearer ${token}` }
-          })
-          .then((response) => {
-            localStorage.setItem("user", JSON.stringify(response.data));
-            navigate("/", { state: "register" });
-          })
-          .catch((err) => {
-            console.log(err);
-            navigate("/", { state: "register" });
-          });
+          // Cookie is set automatically by the server (httpOnly)
+          api.get("/me")
+            .then((response) => {
+              localStorage.setItem("user", JSON.stringify(response.data));
+              navigate("/", { state: "register" });
+            })
+            .catch((err) => {
+              console.log(err);
+              navigate("/", { state: "register" });
+            });
         }
       })
       .catch((err) => {
         console.log(err);
-        toast.error(err.response.data?.detail || err.message);
+        toast.error(err.response?.data?.detail || err.message);
       });
   };
 

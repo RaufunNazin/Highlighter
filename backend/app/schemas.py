@@ -70,3 +70,26 @@ class SegmentResponse(BaseModel):
     total_segments: int
     total_time: float
     metrics: Optional[ModelMetrics] = None
+
+
+# ── Timeline editor schemas ──
+
+class SegmentInput(BaseModel):
+    """A single keep-segment supplied by the frontend timeline editor."""
+    start: float
+    end: float
+
+
+class RenderRequest(BaseModel):
+    """Request body for POST /render_highlights/."""
+    video_filename: str
+    segments: List[SegmentInput]
+
+
+class AnalyzeResponse(BaseModel):
+    """Response for POST /analyze_only/ — no FFmpeg involved."""
+    video_filename: str
+    subtitle_filename: str
+    video_duration: float
+    segments: List[dict]  # [{start, end, score}]
+    metrics: ModelMetrics
