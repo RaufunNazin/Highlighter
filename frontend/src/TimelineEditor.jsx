@@ -34,7 +34,6 @@ const TimelineEditor = () => {
   const [zoom, setZoom] = useState(1);
   const [playheadTime, setPlayheadTime] = useState(0);
   const [exporting, setExporting] = useState(false);
-  const [downloadUrl, setDownloadUrl] = useState(null);
 
   const videoRef = useRef(null);
   const scrollRef = useRef(null);
@@ -185,15 +184,15 @@ const TimelineEditor = () => {
     setExporting(true);
     try {
       const res = await api.post(
-        "/render_highlights/",
+        "/render_async/",
         { video_filename, segments: segments.map((s) => ({ start: s.start, end: s.end })) },
       );
-      setDownloadUrl(BASE + res.data.final_video_url);
-      toast.success(`Render done in ${res.data.total_time.toFixed(1)}s!`);
+      const { job_id } = res.data;
+      toast.success("Render started in background! Redirecting to tracker...");
+      nav(`/jobs/${job_id}`);
     } catch (err) {
       console.error(err);
-      toast.error("Render failed.");
-    } finally {
+      toast.error("Render failed to start.");
       setExporting(false);
     }
   };
@@ -219,7 +218,7 @@ const TimelineEditor = () => {
 
   return (
     <div className="te-root">
-      <ToastContainer position="top-right" autoClose={3000} theme="dark" />
+      <ToastContainer position="top-right" autoClose={3000} theme="light" />
 
       {/* Header */}
       <div className="te-header">
@@ -317,14 +316,6 @@ const TimelineEditor = () => {
           </div>
         ))}
       </div>
-
-      {/* Download bar */}
-      {downloadUrl && (
-        <div className="te-download-bar">
-          <span style={{ color: "#e2e8f0" }}>✅ Your highlight video is ready!</span>
-          <a href={downloadUrl} target="_blank" rel="noopener noreferrer" download>Download MP4</a>
-        </div>
-      )}
     </div>
   );
 };

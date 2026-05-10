@@ -33,6 +33,9 @@ const JobTracker = () => {
       if (res.data.status === "completed" && job?.status !== "completed") {
         toast.success("Analysis complete!");
         localStorage.setItem("lastVideo", res.data.video_filename);
+        if (res.data.result && res.data.result.final_video_url) {
+          localStorage.setItem("finalVideo", res.data.result.final_video_url);
+        }
         setTimeout(() => nav("/highlights"), 2000);
       }
     } catch (err) {

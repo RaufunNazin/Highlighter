@@ -1,11 +1,11 @@
 /* ═══════════════════════════════════════════════════════ */
-/*  Timeline Editor — Premium dark-mode video editor UI  */
+/*  Timeline Editor — Premium light-mode video editor UI  */
 /* ═══════════════════════════════════════════════════════ */
 
 .te-root {
   max-width: 1400px;
   margin: 0 auto;
-  color: #e2e8f0;
+  color: #1e293b;
 }
 
 .te-header {
@@ -14,22 +14,22 @@
   align-items: center;
   margin-bottom: 1.5rem;
 }
-.te-header h1 { font-size: 1.75rem; font-weight: 800; color: #f8fafc; }
+.te-header h1 { font-size: 1.75rem; font-weight: 800; color: #0f172a; }
 
 /* ── Video preview ── */
 .te-video-wrap {
-  background: #0f172a;
+  background: #f1f5f9;
   border-radius: 16px;
   overflow: hidden;
   margin-bottom: 1.25rem;
-  border: 1px solid rgba(255,255,255,.06);
+  border: 1px solid rgba(0,0,0,.06);
 }
 .te-video-wrap video {
   width: 100%;
   max-height: 420px;
   display: block;
   object-fit: contain;
-  background: #000;
+  background: transparent;
 }
 
 /* ── Stats bar ── */
@@ -40,11 +40,12 @@
   flex-wrap: wrap;
 }
 .te-stat {
-  background: rgba(15,23,42,.7);
-  border: 1px solid rgba(255,255,255,.06);
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,.06);
   border-radius: 10px;
   padding: .5rem 1rem;
   font-size: .75rem;
+  color: #475569;
 }
 .te-stat b { color: #38bdf8; margin-right: 6px; }
 
@@ -52,18 +53,18 @@
 .te-minimap {
   position: relative;
   height: 24px;
-  background: #1e293b;
+  background: #e2e8f0;
   border-radius: 6px;
   margin-bottom: 6px;
   overflow: hidden;
   cursor: pointer;
-  border: 1px solid rgba(255,255,255,.06);
+  border: 1px solid rgba(0,0,0,.06);
 }
 .te-minimap-seg {
   position: absolute;
   top: 2px;
   bottom: 2px;
-  background: rgba(34,197,94,.45);
+  background: rgba(34,197,94,.6);
   border-radius: 3px;
 }
 .te-minimap-viewport {
@@ -72,7 +73,7 @@
   bottom: 0;
   border: 2px solid rgba(56,189,248,.8);
   border-radius: 4px;
-  background: rgba(56,189,248,.08);
+  background: rgba(56,189,248,.15);
   pointer-events: none;
 }
 
@@ -84,9 +85,9 @@
   margin-bottom: .5rem;
 }
 .te-zoom-bar button {
-  background: #1e293b;
-  border: 1px solid rgba(255,255,255,.1);
-  color: #94a3b8;
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,.1);
+  color: #64748b;
   border-radius: 6px;
   width: 32px;
   height: 32px;
@@ -97,7 +98,7 @@
   align-items: center;
   justify-content: center;
 }
-.te-zoom-bar button:hover { background: #334155; color: #f8fafc; }
+.te-zoom-bar button:hover { background: #f8fafc; color: #0f172a; }
 .te-zoom-label { font-size: .7rem; color: #64748b; min-width: 36px; text-align: center; }
 
 /* ── Timeline container (scrollable) ── */
@@ -105,8 +106,8 @@
   overflow-x: auto;
   overflow-y: hidden;
   border-radius: 12px;
-  border: 1px solid rgba(255,255,255,.06);
-  background: #0f172a;
+  border: 1px solid rgba(0,0,0,.06);
+  background: #ffffff;
   margin-bottom: 1rem;
 }
 .te-timeline-inner {
@@ -118,21 +119,21 @@
 .te-ruler {
   position: relative;
   height: 28px;
-  border-bottom: 1px solid rgba(255,255,255,.08);
+  border-bottom: 1px solid rgba(0,0,0,.08);
   user-select: none;
 }
 .te-ruler-tick {
   position: absolute;
   top: 0;
   bottom: 0;
-  border-left: 1px solid rgba(255,255,255,.12);
+  border-left: 1px solid rgba(0,0,0,.12);
 }
 .te-ruler-tick span {
   position: absolute;
   top: 4px;
   left: 4px;
   font-size: .6rem;
-  color: #475569;
+  color: #64748b;
   white-space: nowrap;
 }
 
@@ -142,8 +143,8 @@
   height: 56px;
   background: repeating-linear-gradient(
     90deg,
-    rgba(255,255,255,.015) 0px,
-    rgba(255,255,255,.015) 1px,
+    rgba(0,0,0,.02) 0px,
+    rgba(0,0,0,.02) 1px,
     transparent 1px,
     transparent 60px
   );
@@ -153,14 +154,14 @@
   position: absolute;
   top: 4px;
   bottom: 4px;
-  background: linear-gradient(135deg, rgba(34,197,94,.5), rgba(16,185,129,.4));
-  border: 1px solid rgba(34,197,94,.6);
+  background: linear-gradient(135deg, rgba(34,197,94,.8), rgba(16,185,129,.7));
+  border: 1px solid rgba(21,128,61,.4);
   border-radius: 6px;
   transition: box-shadow .15s;
   cursor: grab;
 }
 .te-segment:hover {
-  box-shadow: 0 0 16px rgba(34,197,94,.35);
+  box-shadow: 0 0 16px rgba(34,197,94,.5);
 }
 .te-segment-label {
   position: absolute;
@@ -168,7 +169,7 @@
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: .6rem;
-  color: rgba(255,255,255,.8);
+  color: #ffffff;
   white-space: nowrap;
   pointer-events: none;
   font-weight: 600;
@@ -191,10 +192,10 @@
   width: 3px;
   height: 24px;
   border-radius: 2px;
-  background: rgba(255,255,255,.4);
+  background: rgba(255,255,255,.6);
   transition: background .15s;
 }
-.te-handle:hover::after { background: rgba(255,255,255,.8); }
+.te-handle:hover::after { background: #ffffff; }
 .te-handle-left { left: -5px; }
 .te-handle-right { right: -5px; }
 
@@ -222,7 +223,7 @@
 .te-waveform-wrap {
   position: relative;
   height: 48px;
-  border-top: 1px solid rgba(255,255,255,.06);
+  border-top: 1px solid rgba(0,0,0,.06);
 }
 
 /* ── Segment list ── */
@@ -233,17 +234,18 @@
   margin-bottom: 1.5rem;
 }
 .te-seglist-item {
-  background: rgba(15,23,42,.6);
-  border: 1px solid rgba(255,255,255,.06);
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,.06);
   border-radius: 10px;
   padding: .75rem 1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: .8rem;
+  color: #1e293b;
   transition: border-color .15s;
 }
-.te-seglist-item:hover { border-color: rgba(34,197,94,.4); }
+.te-seglist-item:hover { border-color: rgba(34,197,94,.6); }
 .te-seglist-remove {
   background: none;
   border: none;
@@ -277,9 +279,9 @@
 .te-btn-export:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(34,197,94,.4); }
 .te-btn-export:disabled { opacity: .4; cursor: not-allowed; transform: none; }
 .te-btn-secondary {
-  background: #1e293b;
-  color: #94a3b8;
-  border: 1px solid rgba(255,255,255,.1);
+  background: #ffffff;
+  color: #64748b;
+  border: 1px solid rgba(0,0,0,.1);
   padding: .6rem 1.5rem;
   border-radius: 10px;
   font-weight: 600;
@@ -287,7 +289,7 @@
   cursor: pointer;
   transition: all .15s;
 }
-.te-btn-secondary:hover { background: #334155; color: #f8fafc; }
+.te-btn-secondary:hover { background: #f8fafc; color: #0f172a; }
 
 /* ── Download overlay ── */
 .te-download-bar {

@@ -7,7 +7,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 url = os.getenv("DB_URL")
-engine = create_engine(url)
+engine = create_engine(
+    url,
+    pool_pre_ping=True,
+    pool_recycle=3600,
+)
 SessionLocal = sessionmaker(autocommit = False, autoflush = False, bind = engine)
 Base = declarative_base()
 

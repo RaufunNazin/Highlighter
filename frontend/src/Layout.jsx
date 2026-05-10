@@ -6,7 +6,8 @@ import api from "./api";
 const NAV_LINKS = [
   { to: "/", label: "Home" },
   { to: "/editor", label: "Editor" },
-  { to: "/highlights", label: "Highlights" },
+  { to: "/timeline", label: "Timeline" },
+  { to: "/highlights", label: "Exports" },
   { to: "/jobs", label: "Jobs" },
   { to: "/compare", label: "Analytics" },
 ];
@@ -153,7 +154,7 @@ const Layout = ({ children }) => {
               <h4 className="font-bold text-slate-900 mb-4 text-xs uppercase tracking-widest">Platform</h4>
               <ul className="space-y-2 text-sm text-slate-500">
                 <li onClick={() => navigate("/editor")} className="hover:text-primary cursor-pointer transition-colors">Video Editor</li>
-                <li onClick={() => navigate("/highlights")} className="hover:text-primary cursor-pointer transition-colors">Highlights</li>
+                <li onClick={() => navigate("/highlights")} className="hover:text-primary cursor-pointer transition-colors">Exports</li>
                 <li onClick={() => navigate("/jobs")} className="hover:text-primary cursor-pointer transition-colors">Job Tracker</li>
                 <li onClick={() => navigate("/compare")} className="hover:text-primary cursor-pointer transition-colors">Model Analytics</li>
               </ul>

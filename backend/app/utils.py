@@ -47,50 +47,7 @@ MODEL_REGISTRY = {
     },
 }
 
-# -------------------- Keyword Categories --------------------
-
-EXCITING_KEYWORDS = {
-        "goal", "scored", "winning", "champion", "shoot", "shot", "attack", "dribble", "tackle",
-        "strike", "header", "corner", "free-kick", "penalty", "save", "offside", "counterattack",
-        "equalizer", "hat-trick", "celebration", "cheer", "roar", "thrilling", "sensational",
-        "brilliant", "amazing", "unbelievable", "stunning", "spectacular", "breathtaking",
-        "incredible", "comeback", "last-minute", "injury-time", "extra-time", "pressure",
-        "intense", "electric", "frenzy", "fast-paced", "end-to-end", "breakaway", "unstoppable",
-        "masterclass", "legendary", "heroic", "explosive", "wild", "epic", "drama", "magnificent",
-        "blockbuster", "thunderous", "volley", "half-volley", "bicycle-kick", "chip", "curling",
-        "dazzling", "finesse", "powerful", "blistering", "world-class", "red-card", "yellow-card",
-        "foul", "controversial", "VAR", "heart-stopping", "nail-biting", "edge-of-seat", "relentless",
-        "dominance", "flawless", "decisive", "magic", "triumph", "rivalry", "undefeated",
-        "gutsy", "miraculous", "roaring", "breakthrough", "highlight", "unstoppable-run",
-        "backheel", "nutmeg", "long-range", "wonder-goal", "screamer", "rocket",
-        "top-corner", "worldie", "brilliant-save", "last-gasp", "title-decider", "underdog-victory",
-        "record-breaking", "moment-of-magic"
-    }
-
-HIGH_IMPACT_KEYWORDS = {
-    "goal", "scored", "penalty", "red card", "yellow card", "free kick",
-    "corner", "VAR", "equalizer", "last-minute", "extra-time", "injury-time"
-}
-
-BORING_KEYWORDS = {
-        "goalless", "draw", "dull", "slow", "boring", "lackluster", "passive", "uneventful", "mundane",
-        "predictable", "stagnant", "lifeless", "tedious", "pointless", "disappointing", "underwhelming",
-        "missed", "off-target", "sideways", "backpass", "defensive", "cautious", "meaningless",
-        "scoreless", "static", "half-hearted", "weak", "sloppy", "mistake", "error", "misplaced",
-        "poor", "underperforming", "time-wasting", "delay", "long-ball", "scrappy", "stretched",
-        "slow-tempo", "exhausted", "foul-filled", "stoppage", "injury-break", "out-of-form", "routine",
-        "unambitious", "tired", "wasteful", "long-spell", "no-attacking-intent", "midfield-battle",
-        "low-energy", "inconsistent", "pass-heavy", "aimless", "non-threatening", "predictable-passing",
-        "offside-trap", "possession-based", "no-clear-chances", "low-intensity", "one-sided",
-        "overhit", "underhit", "overcautious", "deep-block", "meaningless-possession", "cagey",
-        "conservative", "out-of-ideas", "low-block", "park-the-bus", "counterproductive",
-        "negative-play", "uninspired", "dry-spell", "few-opportunities", "no-shots-on-target",
-        "defensive-minded", "wasted-opportunities", "shutout", "midfield-clog", "passive-pressing",
-        "drained", "time-wasting-tactics", "holding-shape", "recycled-passing", "safe-play",
-        "lacking-creativity", "few-highlights", "excessive-passing", "non-clinical", "careless",
-        "missed-sitter", "out-of-sync", "poor-control", "miscommunication", "slow-buildup",
-        "low-risk", "lack-of-movement", "rigid", "lacking-intensity", "possession-without-purpose"
-    }
+# Keyword logic removed as requested
 
 # -------------------- Subtitle Loader --------------------
 
@@ -178,24 +135,15 @@ def analyze_excitement(subtitles, model_key: str = "bert", logger=None):
         if not text:
             continue
 
-        text_lower = text.lower()
         start_time = subtitle["start"]
         end_time = subtitle["end"]
-
-        contains_exciting_word = any(word in text_lower for word in EXCITING_KEYWORDS)
-        contains_high_impact_word = any(word in text_lower for word in HIGH_IMPACT_KEYWORDS)
-        contains_boring_word = any(word in text_lower for word in BORING_KEYWORDS)
 
         result = sentiment_pipeline(text)[0]
         excitement_score, confidence = _normalize_score(result, model_info["label_type"])
         confidence_scores.append(confidence)
 
-        is_exciting = (excitement_score > 0.6) or contains_exciting_word
-        is_high_impact = contains_high_impact_word
-        is_boring = contains_boring_word and not is_exciting
-
-        if is_exciting or is_high_impact:
-            adjusted_start, adjusted_end = adjust_timestamps(start_time, end_time, is_high_impact)
+        if excitement_score >= 0.98:
+            adjusted_start, adjusted_end = adjust_timestamps(start_time, end_time)
             exciting_timestamps.append((adjusted_start, adjusted_end))
             highlights_found += 1
 
@@ -222,15 +170,10 @@ def analyze_excitement(subtitles, model_key: str = "bert", logger=None):
 
 # -------------------- Timestamp Helpers --------------------
 
-def adjust_timestamps(start, end, is_high_impact):
+def adjust_timestamps(start, end):
     start_dt = datetime.strptime(start, "%H:%M:%S,%f")
     end_dt = datetime.strptime(end, "%H:%M:%S,%f")
-    if is_high_impact:
-        start_dt -= timedelta(seconds=5)
-        end_dt += timedelta(seconds=5)
-    else:
-        start_dt -= timedelta(seconds=2)
-        end_dt += timedelta(seconds=2)
+    # No extra padding, just use the subtitle duration
     return start_dt.strftime("%H:%M:%S,%f")[:-3], end_dt.strftime("%H:%M:%S,%f")[:-3]
 
 
@@ -243,7 +186,8 @@ def merge_overlapping_timestamps(timestamps):
     for next_start, next_end in timestamps[1:]:
         current_end_dt = datetime.strptime(current_end, "%H:%M:%S,%f")
         next_start_dt = datetime.strptime(next_start, "%H:%M:%S,%f")
-        if next_start_dt <= current_end_dt + timedelta(seconds=3):
+        # Only merge if they strictly overlap or touch (0s gap tolerance)
+        if next_start_dt <= current_end_dt:
             current_end = max(current_end, next_end)
         else:
             merged_timestamps.append((current_start, current_end))
@@ -376,18 +320,15 @@ def get_video_duration(input_file: str) -> float:
         return 0.0
 
 
-def trim_video_from_segments(input_file: str, segments: list, output_folder: str) -> str:
+def trim_video_from_segments(input_file: str, segments: list, output_folder: str, logger=None) -> str:
     """
     Trim and concatenate segments from the source video in a single FFmpeg pass.
-
-    Args:
-        input_file:   Absolute path to the source video.
-        segments:     List of dicts with keys ``start`` and ``end`` (floats, seconds).
-        output_folder: Directory where the final MP4 will be written.
-
-    Returns:
-        Absolute path to the produced output file.
     """
+    def log(msg):
+        print(msg)
+        if logger:
+            logger(msg)
+
     if not segments:
         raise ValueError("segments list must not be empty")
 
@@ -416,10 +357,25 @@ def trim_video_from_segments(input_file: str, segments: list, output_folder: str
         "-y", final_output,
     ]
 
-    print(f"[trim_video_from_segments] FFmpeg pass for {n} segment(s)...")
-    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"FFmpeg failed:\n{result.stdout}")
+    log(f"[trim_video_from_segments] FFmpeg pass for {n} segment(s)...")
+    try:
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            universal_newlines=True
+        )
+        for line in process.stdout:
+            line = line.strip()
+            if line:
+                log(f"  > {line}")
+        process.wait()
+        if process.returncode != 0:
+            raise RuntimeError(f"FFmpeg failed with code {process.returncode}")
+    except Exception as e:
+        raise RuntimeError(f"FFmpeg execution failed: {str(e)}")
 
-    print(f"[trim_video_from_segments] Done in {time.time()-t0:.2f}s → {final_output}")
+    log(f"[trim_video_from_segments] Done in {time.time()-t0:.2f}s → {final_output}")
     return final_output

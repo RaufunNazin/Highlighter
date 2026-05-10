@@ -13,7 +13,7 @@ from ..schemas import TrimVideoRequest, RenderRequest, AnalyzeResponse
 from fastapi import WebSocket, WebSocketDisconnect
 import json
 import asyncio
-from ..tasks import process_video_task
+from ..tasks import process_video_task, analyze_only_task, render_highlights_task
 from celery.result import AsyncResult
 from ..celery_app import celery_app
 
@@ -23,7 +23,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_DIR = os.path.join(BASE_DIR, "..", "static")
 
 # ── Upload size limits ──
-MAX_VIDEO_SIZE = 500 * 1024 * 1024   # 500 MB
+MAX_VIDEO_SIZE = 1024 * 1024 * 1024   # 1 GB
 MAX_SUBTITLE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
@@ -31,12 +31,12 @@ async def validate_upload_sizes(video: UploadFile, subtitle: UploadFile):
     """Read file sizes and reject if they exceed limits. Must be called before saving."""
     video_bytes = await video.read()
     if len(video_bytes) > MAX_VIDEO_SIZE:
-        raise HTTPException(status_code=413, detail=f"Video file too large. Maximum allowed: {MAX_VIDEO_SIZE // (1024*1024)} MB.")
+        raise HTTPException(status_code=413, detail=f"The video file is too large. Please upload a file smaller than {MAX_VIDEO_SIZE // (1024*1024)} MB.")
     await video.seek(0)
 
     subtitle_bytes = await subtitle.read()
     if len(subtitle_bytes) > MAX_SUBTITLE_SIZE:
-        raise HTTPException(status_code=413, detail=f"Subtitle file too large. Maximum allowed: {MAX_SUBTITLE_SIZE // (1024*1024)} MB.")
+        raise HTTPException(status_code=413, detail=f"The subtitle file is too large. Please upload a file smaller than {MAX_SUBTITLE_SIZE // (1024*1024)} MB.")
     await subtitle.seek(0)
 
 
@@ -63,11 +63,11 @@ async def create_segments(
     if model_key not in MODEL_REGISTRY:
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown model '{model_key}'. Available: {list(MODEL_REGISTRY.keys())}",
+            detail="The selected analysis model is currently unavailable. Please select a different model.",
         )
 
     if not subtitle.filename.endswith(".srt"):
-        raise HTTPException(status_code=400, detail="Only .srt subtitle files are supported.")
+        raise HTTPException(status_code=400, detail="Only .srt subtitle formats are supported at this time.")
 
     await validate_upload_sizes(video, subtitle)
 
@@ -86,7 +86,7 @@ async def create_segments(
 
     subtitles = load_subtitles(subtitle_path)
     if not subtitles:
-        raise HTTPException(status_code=400, detail="No subtitles found in file.")
+        raise HTTPException(status_code=400, detail="We couldn't detect any valid subtitle text in your file.")
 
     # analyze_excitement now returns (timestamps, metrics)
     timestamps, metrics = analyze_excitement(subtitles, model_key=model_key)
@@ -143,11 +143,11 @@ async def process_async(
     if model_key not in MODEL_REGISTRY:
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown model '{model_key}'. Available: {list(MODEL_REGISTRY.keys())}",
+            detail="The selected analysis model is currently unavailable. Please select a different model.",
         )
 
     if not subtitle.filename.endswith(".srt"):
-        raise HTTPException(status_code=400, detail="Only .srt subtitle files are supported.")
+        raise HTTPException(status_code=400, detail="Only .srt subtitle formats are supported at this time.")
 
     await validate_upload_sizes(video, subtitle)
 
@@ -238,6 +238,54 @@ def delete_job(job_id: str, db: Session = Depends(get_db), user=Depends(get_curr
     db.commit()
     
     return {"message": "Job deleted successfully"}
+
+@router.websocket("/ws/jobs/{job_id}")
+async def websocket_job_status(websocket: WebSocket, job_id: str, db: Session = Depends(get_db)):
+    await websocket.accept()
+    try:
+        while True:
+            db.expire_all()
+            job = db.query(models.ProcessingJob).filter(models.ProcessingJob.id == job_id).first()
+            if not job:
+                await websocket.send_text(json.dumps({"type": "error", "message": "Job not found"}))
+                break
+                
+            task_result = AsyncResult(job_id, app=celery_app)
+            logs = []
+            
+            effective_status = job.status
+            if task_result.state == 'PROCESSING':
+                info = task_result.info
+                if isinstance(info, dict):
+                    logs = info.get('logs', [])
+            elif task_result.state == 'FAILURE':
+                effective_status = 'failed'
+                info = task_result.info
+                logs = [f"Error: {str(info)}"]
+            elif task_result.state == 'SUCCESS':
+                effective_status = 'completed'
+                logs = ["Task completed successfully."]
+                
+            payload = {
+                "type": "log",
+                "status": effective_status,
+                "logs": logs,
+                "result": task_result.result if task_result.state == 'SUCCESS' else None
+            }
+            await websocket.send_text(json.dumps(payload))
+            
+            if effective_status in ['completed', 'failed']:
+                break
+            await asyncio.sleep(0.5)
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        print("WS Error:", e)
+    finally:
+        try:
+            await websocket.close()
+        except:
+            pass
 
 @router.websocket("/ws/analyze")
 async def websocket_analyze(websocket: WebSocket, db: Session = Depends(get_db)):
@@ -368,13 +416,13 @@ async def trim_video_api(
 ):
     segment_names = request.segment_names
     if not segment_names:
-        raise HTTPException(status_code=400, detail="No segments selected.")
+        raise HTTPException(status_code=400, detail="Please select at least one segment to process.")
 
     segment_files = []
     for name in segment_names:
         path = os.path.join(STATIC_DIR, name)
         if not os.path.exists(path):
-            raise HTTPException(status_code=404, detail=f"Segment {name} not found.")
+            raise HTTPException(status_code=404, detail="One or more selected segments could not be found. Please try again.")
         segment_files.append(path)
 
     video_concat_start = time.time()
@@ -395,7 +443,7 @@ async def trim_video_api(
 
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if result.returncode != 0:
-            raise HTTPException(status_code=500, detail=f"FFmpeg Error: {result.stderr}")
+            raise HTTPException(status_code=500, detail="We encountered an issue while rendering your video. Please try again later.")
 
         os.remove(concat_list_file)
 
@@ -428,7 +476,7 @@ async def trim_video_api(
         }
 
     except Exception as ex:
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(ex)}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred during processing. Please try again later.")
     finally:
         if os.path.exists(concat_list_file):
             os.remove(concat_list_file)
@@ -438,25 +486,22 @@ async def trim_video_api(
 # NEW: Analyze-only endpoint (no FFmpeg, returns timestamps)
 # ─────────────────────────────────────────────────────────────
 
-@router.post("/analyze_only/", status_code=200)
-async def analyze_only(
+@router.post("/analyze_async/", status_code=202)
+async def analyze_async(
     video: UploadFile = File(...),
     subtitle: UploadFile = File(...),
     model_key: str = Form(default="bert"),
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """
-    Upload video + subtitle, run NLP analysis, return highlight segments.
-    No FFmpeg clip generation — just timestamps + video duration.
-    """
+    """Start asynchronous analyze-only task"""
     if model_key not in MODEL_REGISTRY:
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown model '{model_key}'. Available: {list(MODEL_REGISTRY.keys())}",
+            detail="The selected analysis model is currently unavailable. Please select a different model.",
         )
     if not subtitle.filename.endswith(".srt"):
-        raise HTTPException(status_code=400, detail="Only .srt subtitle files are supported.")
+        raise HTTPException(status_code=400, detail="Only .srt subtitle formats are supported at this time.")
 
     await validate_upload_sizes(video, subtitle)
 
@@ -471,99 +516,70 @@ async def analyze_only(
     with open(subtitle_path, "wb") as f:
         shutil.copyfileobj(subtitle.file, f)
 
-    subtitles = load_subtitles(subtitle_path)
-    if not subtitles:
-        raise HTTPException(status_code=400, detail="No subtitles found in file.")
+    task_id = str(uuid.uuid4())
+    new_job = models.ProcessingJob(
+        id=task_id,
+        user_id=user.id,
+        status="pending",
+        video_filename=unique_video_filename,
+        subtitle_filename=unique_subtitle_filename,
+        model_key=model_key
+    )
+    db.add(new_job)
+    db.commit()
 
-    loop = asyncio.get_event_loop()
-    timestamps, metrics = await loop.run_in_executor(
-        None, analyze_excitement, subtitles, model_key, None
+    task = analyze_only_task.apply_async(
+        args=[unique_video_filename, unique_subtitle_filename, model_key, user.id],
+        task_id=task_id
     )
 
-    video_duration = get_video_duration(video_path)
-
-    # Convert HH:MM:SS,ms strings to floats
-    from ..utils import convert_to_seconds
-    segments = []
-    for start_str, end_str in timestamps:
-        try:
-            segments.append({
-                "start": round(convert_to_seconds(start_str), 3),
-                "end": round(convert_to_seconds(end_str), 3),
-                "score": metrics.get("avg_confidence", 0.0),
-            })
-        except Exception:
-            pass
-
-    return {
-        "video_filename": unique_video_filename,
-        "subtitle_filename": unique_subtitle_filename,
-        "video_duration": video_duration,
-        "segments": segments,
-        "metrics": metrics,
-    }
+    return {"message": "Analysis started", "job_id": task_id}
 
 
 # ─────────────────────────────────────────────────────────────
 # NEW: Render endpoint (single FFmpeg pass on approved segments)
 # ─────────────────────────────────────────────────────────────
 
-@router.post("/render_highlights/", status_code=201)
-async def render_highlights(
+@router.post("/render_async/", status_code=202)
+async def render_async(
     request: RenderRequest,
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """
-    Accept user-approved keep-segments and produce a single output video
-    using one FFmpeg filter-complex pass. No intermediate clips created.
-    """
     if not request.segments:
-        raise HTTPException(status_code=400, detail="segments list must not be empty.")
+        raise HTTPException(status_code=400, detail="Please select at least one segment to include in your highlights.")
 
-    # Guard against path traversal
     safe_name = os.path.basename(request.video_filename)
     if safe_name != request.video_filename or ".." in request.video_filename:
-        raise HTTPException(status_code=400, detail="Invalid video filename.")
+        raise HTTPException(status_code=400, detail="The provided video filename is invalid.")
 
     video_path = os.path.join(STATIC_DIR, safe_name)
     if not os.path.exists(video_path):
-        raise HTTPException(status_code=404, detail="Source video not found on server.")
+        raise HTTPException(status_code=404, detail="The source video could not be found. Please upload it again.")
 
-    # Sort segments by start time and clamp negatives
     raw_segments = [
         {"start": max(0.0, seg.start), "end": seg.end}
         for seg in sorted(request.segments, key=lambda s: s.start)
         if seg.end > seg.start
     ]
     if not raw_segments:
-        raise HTTPException(status_code=400, detail="No valid segments (end must be > start).")
+        raise HTTPException(status_code=400, detail="The selected segments are invalid. Please check your selections and try again.")
 
-    loop = asyncio.get_event_loop()
-    t0 = time.time()
-    try:
-        final_path = await loop.run_in_executor(
-            None, trim_video_from_segments, video_path, raw_segments, STATIC_DIR
-        )
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    total_time = time.time() - t0
-    final_video_url = os.path.basename(final_path)
-
-    # Persist to edit history
-    new_history = models.EditHistory(
-        inputVideo=request.video_filename,
-        outputVideo=final_video_url,
-        subtitle="",
-        time=str(total_time),
+    task_id = str(uuid.uuid4())
+    new_job = models.ProcessingJob(
+        id=task_id,
         user_id=user.id,
+        status="pending",
+        video_filename=request.video_filename,
+        subtitle_filename="",
+        model_key="render"
     )
-    db.add(new_history)
+    db.add(new_job)
     db.commit()
 
-    return {
-        "message": "Render complete",
-        "final_video_url": final_video_url,
-        "total_time": total_time,
-    }
+    task = render_highlights_task.apply_async(
+        args=[request.video_filename, raw_segments, user.id],
+        task_id=task_id
+    )
+
+    return {"message": "Render started", "job_id": task_id}

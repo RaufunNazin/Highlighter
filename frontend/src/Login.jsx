@@ -30,11 +30,13 @@ const Login = () => {
           api.get("/me")
             .then((response) => {
               localStorage.setItem("user", JSON.stringify(response.data));
-              navigate("/", { state: "login" });
+              const from = state?.from || "/";
+              navigate(from, { state: "login" });
             })
             .catch((err) => {
               console.log(err);
-              navigate("/", { state: "login" });
+              const from = state?.from || "/";
+              navigate(from, { state: "login" });
             });
         }
       })

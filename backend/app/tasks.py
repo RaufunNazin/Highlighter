@@ -91,3 +91,129 @@ def process_video_task(self, video_filename: str, subtitle_filename: str, model_
         raise e
     finally:
         db.close()
+
+@celery_app.task(bind=True, name="app.tasks.analyze_only_task")
+def analyze_only_task(self, video_filename: str, subtitle_filename: str, model_key: str, user_id: int):
+    task_id = self.request.id
+    db = SessionLocal()
+    job = None
+    video_path = os.path.join(STATIC_DIR, video_filename)
+    subtitle_path = os.path.join(STATIC_DIR, subtitle_filename)
+    try:
+        job = db.query(models.ProcessingJob).filter(models.ProcessingJob.id == task_id).first()
+        if job:
+            job.status = "processing"
+            db.commit()
+
+        local_logs = []
+        def sync_logger(msg):
+            local_logs.append(msg)
+            self.update_state(state='PROCESSING', meta={'logs': list(local_logs)})
+            print(f"[Task {task_id}] {msg}")
+
+        sync_logger("Initializing analysis pipeline...")
+        subtitles = load_subtitles(subtitle_path)
+        sync_logger(f"Subtitles loaded. Total: {len(subtitles)}")
+
+        sync_logger(f"Starting sentiment analysis with {model_key} model...")
+        timestamps, metrics = analyze_excitement(subtitles, model_key, sync_logger)
+
+        from .utils import get_video_duration, convert_to_seconds
+        video_duration = get_video_duration(video_path)
+        
+        segments = []
+        for start_str, end_str in timestamps:
+            try:
+                segments.append({
+                    "start": round(convert_to_seconds(start_str), 3),
+                    "end": round(convert_to_seconds(end_str), 3),
+                    "score": metrics.get("avg_confidence", 0.0),
+                })
+            except Exception:
+                pass
+                
+        if job:
+            job.status = "completed"
+            job.completed_at = str(datetime.utcnow())
+        db.commit()
+        sync_logger("All processing completed successfully!")
+        
+        return {
+            "video_filename": video_filename,
+            "subtitle_filename": subtitle_filename,
+            "video_duration": video_duration,
+            "segments": segments,
+            "metrics": metrics
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        if job:
+            job.status = "failed"
+            job.error_message = str(e)
+            job.completed_at = str(datetime.utcnow())
+            db.commit()
+        raise e
+    finally:
+        db.close()
+
+@celery_app.task(bind=True, name="app.tasks.render_highlights_task")
+def render_highlights_task(self, video_filename: str, segments: list, user_id: int):
+    task_id = self.request.id
+    db = SessionLocal()
+    job = None
+    try:
+        job = db.query(models.ProcessingJob).filter(models.ProcessingJob.id == task_id).first()
+        if job:
+            job.status = "processing"
+            db.commit()
+
+        local_logs = []
+        def sync_logger(msg):
+            local_logs.append(msg)
+            self.update_state(state='PROCESSING', meta={'logs': list(local_logs)})
+            print(f"[Task {task_id}] {msg}")
+            
+        sync_logger("Starting FFmpeg merge process...")
+        video_path = os.path.join(STATIC_DIR, video_filename)
+        
+        from .utils import trim_video_from_segments
+        import time
+        t0 = time.time()
+        
+        final_path = trim_video_from_segments(video_path, segments, STATIC_DIR, sync_logger)
+        
+        total_time = time.time() - t0
+        final_video_url = os.path.basename(final_path)
+        
+        sync_logger(f"Render complete in {total_time:.2f}s!")
+        
+        new_history = models.EditHistory(
+            inputVideo=video_filename,
+            outputVideo=final_video_url,
+            subtitle="",
+            time=str(total_time),
+            user_id=user_id,
+        )
+        db.add(new_history)
+        
+        if job:
+            job.status = "completed"
+            job.completed_at = str(datetime.utcnow())
+        db.commit()
+        
+        return {
+            "final_video_url": final_video_url,
+            "total_time": total_time,
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        if job:
+            job.status = "failed"
+            job.error_message = str(e)
+            job.completed_at = str(datetime.utcnow())
+            db.commit()
+        raise e
+    finally:
+        db.close()

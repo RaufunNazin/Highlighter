@@ -7,6 +7,8 @@ from .routers import edit, user, auth, history, segment
 from dotenv import load_dotenv
 load_dotenv()
 import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 from fastapi.responses import FileResponse
 import mimetypes
 

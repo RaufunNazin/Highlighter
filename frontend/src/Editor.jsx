@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -18,6 +18,67 @@ const Editor = () => {
   const [subtitle, setSubtitle] = useState(null);
   const [selectedModel, setSelectedModel] = useState("bert");
   const [loading, setLoading] = useState(false);
+  const [jobId, setJobId] = useState(null);
+  const [logs, setLogs] = useState([]);
+  const logsEndRef = useRef(null);
+
+  useEffect(() => {
+    if (logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [logs]);
+
+  useEffect(() => {
+    if (!jobId) return;
+
+    let ws = null;
+    let connected = false;
+    let isCleanedUp = false;
+
+    const connectWS = () => {
+      if (isCleanedUp) return;
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const baseURL = api.defaults.baseURL.replace(/^https?:\/\//, "");
+      ws = new WebSocket(`${protocol}//${baseURL}ws/jobs/${jobId}`);
+
+      ws.onopen = () => { connected = true; };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "log" && data.logs) {
+            setLogs(data.logs);
+          }
+          if (data.status === "completed" && data.result) {
+            isCleanedUp = true;
+            localStorage.setItem("lastVideo", data.result.video_filename);
+            toast.success("Analysis complete! Opening timeline editor…");
+            setJobId(null);
+            setLoading(false);
+            if (ws) ws.close();
+            nav("/timeline", { state: data.result });
+          } else if (data.status === "failed") {
+            isCleanedUp = true;
+            toast.error("Analysis failed. Please check the logs or try again.");
+            setJobId(null);
+            setLoading(false);
+            if (ws) ws.close();
+          }
+        } catch (e) {}
+      };
+
+      ws.onclose = () => {
+        // Removed auto-reconnect to prevent ghost loops
+      };
+    };
+
+    connectWS();
+
+    return () => {
+      isCleanedUp = true;
+      if (ws) ws.close();
+    };
+  }, [jobId, nav]);
 
   const handleSubmit = async () => {
     if (!video || !subtitle) {
@@ -26,6 +87,7 @@ const Editor = () => {
     }
 
     setLoading(true);
+    localStorage.removeItem("finalVideo");
 
     try {
       const formData = new FormData();
@@ -33,18 +95,24 @@ const Editor = () => {
       formData.append("subtitle", subtitle);
       formData.append("model_key", selectedModel);
 
-      const res = await api.post("/analyze_only/", formData, {
+      const res = await api.post("/analyze_async/", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
 
-      toast.success("Analysis complete! Opening timeline editor…");
-      nav("/timeline", { state: res.data });
+      setJobId(res.data.job_id);
 
     } catch (error) {
       console.error("Analysis error:", error);
-      toast.error("Failed to analyze video.");
+      if (error.response && error.response.status === 401) {
+        toast.error("You must be logged in to process videos.");
+        nav("/login", { state: { from: window.location.pathname } });
+      } else if (error.response && error.response.data && error.response.data.detail) {
+        toast.error(error.response.data.detail);
+      } else {
+        toast.error("Failed to analyze video. Please try again.");
+      }
       setLoading(false);
     }
   };
@@ -85,7 +153,7 @@ const Editor = () => {
                             <FiCheckCircle size={20} />
                           </div>
                           <div>
-                             <p className="text-sm font-bold text-slate-900 truncate max-w-[180px]">{video.name}</p>
+                             <p className="text-sm font-bold text-slate-900 truncate max-w-[180px]" title={video.name}>{video.name}</p>
                              <p className="text-[10px] text-green-600 font-bold uppercase mt-1">Ready for upload</p>
                           </div>
                         </>
@@ -117,7 +185,7 @@ const Editor = () => {
                             <FiCheckCircle size={20} />
                           </div>
                           <div>
-                             <p className="text-sm font-bold text-slate-900 truncate max-w-[180px]">{subtitle.name}</p>
+                             <p className="text-sm font-bold text-slate-900 truncate max-w-[180px]" title={subtitle.name}>{subtitle.name}</p>
                              <p className="text-[10px] text-green-600 font-bold uppercase mt-1">Transcript linked</p>
                           </div>
                         </>
@@ -176,6 +244,19 @@ const Editor = () => {
           </div>
         </div>
       </div>
+
+      {jobId && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full">
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-900"><FiCpu className="text-primary"/> Analyzing Video...</h2>
+            <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 h-64 overflow-y-auto font-mono text-xs text-slate-600 space-y-2 relative">
+              {logs.map((l, i) => <div key={i}>&gt; {l}</div>)}
+              {logs.length === 0 && <div className="animate-pulse">Waiting for background worker...</div>}
+              <div ref={logsEndRef} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
