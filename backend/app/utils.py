@@ -153,6 +153,10 @@ def analyze_excitement(subtitles, model_key: str = "bert", logger=None):
     analysis_time = time.time() - analysis_start
     avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0
 
+    safe_analysis_time = max(0.1, analysis_time)
+    safe_load_time = max(0.1, model_load_time)
+    efficiency_score = (avg_confidence * (highlights_found / max(1, len(subtitles)))) / (safe_analysis_time * safe_load_time)
+    
     metrics = {
         "model_key": model_key,
         "model_name": model_info["name"],
@@ -162,9 +166,10 @@ def analyze_excitement(subtitles, model_key: str = "bert", logger=None):
         "total_subtitles": len(subtitles),
         "highlights_found": highlights_found,
         "avg_confidence": round(avg_confidence, 4),
+        "efficiency_score": round(efficiency_score, 4),
     }
 
-    log(f"Done. Highlights: {highlights_found} | Time: {analysis_time:.2f}s | Avg conf: {avg_confidence:.4f}")
+    log(f"Done. Highlights: {highlights_found} | Time: {analysis_time:.2f}s | Avg conf: {avg_confidence:.4f} | Eff: {efficiency_score:.4f}")
     merged = merge_overlapping_timestamps(exciting_timestamps)
     return merged, metrics
 
@@ -379,3 +384,43 @@ def trim_video_from_segments(input_file: str, segments: list, output_folder: str
 
     log(f"[trim_video_from_segments] Done in {time.time()-t0:.2f}s → {final_output}")
     return final_output
+
+
+# -------------------- Evaluation Helpers --------------------
+
+def calculate_ml_metrics(predicted_timestamps, ground_truth_timestamps):
+    """
+    Calculate Precision, Recall, and F1-Score based on timestamp overlap.
+    Timestamps are expected as lists of tuples (start_seconds, end_seconds).
+    """
+    def overlap(t1, t2):
+        return max(0, min(t1[1], t2[1]) - max(t1[0], t2[0]))
+
+    true_positives = 0
+    matched_gt = set()
+
+    for pred in predicted_timestamps:
+        match_found = False
+        for i, gt in enumerate(ground_truth_timestamps):
+            if overlap(pred, gt) > 0:
+                match_found = True
+                matched_gt.add(i)
+                break
+        if match_found:
+            true_positives += 1
+
+    false_positives = len(predicted_timestamps) - true_positives
+    false_negatives = len(ground_truth_timestamps) - len(matched_gt)
+
+    precision = true_positives / len(predicted_timestamps) if predicted_timestamps else 0.0
+    recall = true_positives / len(ground_truth_timestamps) if ground_truth_timestamps else 0.0
+    f1_score = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+
+    return {
+        "precision": round(precision, 4),
+        "recall": round(recall, 4),
+        "f1_score": round(f1_score, 4),
+        "true_positives": true_positives,
+        "false_positives": false_positives,
+        "false_negatives": false_negatives
+    }
