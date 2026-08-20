@@ -43,3 +43,9 @@ Thumbs.db
 #ignore input video and output video
 *.mp4
 *.srt
+results.txt
+*.txt
+
+backend/data/
+
+backend/evaluate_real_data.py

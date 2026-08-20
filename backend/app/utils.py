@@ -1,4 +1,6 @@
+# pyrefly: ignore [missing-import]
 import bcrypt
+# pyrefly: ignore [missing-import]
 from transformers import pipeline
 import re
 import subprocess
@@ -22,28 +24,28 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 MODEL_REGISTRY = {
     "bert": {
-        "name": "BERT Multilingual",
-        "model_id": "nlptown/bert-base-multilingual-uncased-sentiment",
-        "task": "sentiment-analysis",
-        "label_type": "star_rating",
+        "name": "BERT GoEmotions",
+        "model_id": "monologg/bert-base-cased-goemotions-original",
+        "task": "text-classification",
+        "label_type": "goemotions",
     },
     "distilbert": {
-        "name": "DistilBERT",
-        "model_id": "distilbert-base-uncased-finetuned-sst-2-english",
-        "task": "sentiment-analysis",
-        "label_type": "pos_neg",
+        "name": "DistilBERT GoEmotions",
+        "model_id": "joeddav/distilbert-base-uncased-goemotions-student",
+        "task": "text-classification",
+        "label_type": "goemotions",
     },
     "albert": {
-        "name": "ALBERT",
-        "model_id": "textattack/albert-base-v2-SST-2",
-        "task": "sentiment-analysis",
-        "label_type": "pos_neg",
+        "name": "ALBERT GoEmotions (Fallback)",
+        "model_id": "SamLowe/roberta-base-go_emotions",
+        "task": "text-classification",
+        "label_type": "goemotions",
     },
     "roberta": {
-        "name": "RoBERTa",
-        "model_id": "cardiffnlp/twitter-roberta-base-sentiment-latest",
-        "task": "sentiment-analysis",
-        "label_type": "pos_neg",
+        "name": "RoBERTa GoEmotions",
+        "model_id": "SamLowe/roberta-base-go_emotions",
+        "task": "text-classification",
+        "label_type": "goemotions",
     },
 }
 
@@ -63,16 +65,32 @@ def load_subtitles(subtitle_file):
 
     for line in lines:
         line = line.strip()
+        if not line:
+            if current_subtitle["start"] and current_subtitle["text"]:
+                current_subtitle["text"] = current_subtitle["text"].strip()
+                subtitles.append(current_subtitle)
+                current_subtitle = {"start": None, "end": None, "text": ""}
+            continue
+            
         if "-->" in line:
             times = line.split(" --> ")
             current_subtitle["start"] = times[0]
             current_subtitle["end"] = times[1]
-        elif line == "":
-            if current_subtitle["start"] and current_subtitle["text"]:
-                subtitles.append(current_subtitle)
-                current_subtitle = {"start": None, "end": None, "text": ""}
+        elif line.isdigit():
+            # Skip the subtitle index numbers
+            continue
         else:
-            current_subtitle["text"] += " " + line
+            # Strip out formatting noise (e.g. ">>", "-", brackets like "[cheering]")
+            clean_line = re.sub(r'\[.*?\]', '', line)
+            clean_line = clean_line.replace(">>", "").replace("- ", "").strip()
+            
+            if clean_line:
+                current_subtitle["text"] += " " + clean_line
+
+    # Catch the last subtitle if the file doesn't end with a blank line
+    if current_subtitle["start"] and current_subtitle["text"]:
+        current_subtitle["text"] = current_subtitle["text"].strip()
+        subtitles.append(current_subtitle)
 
     print(f"Subtitles loaded. Total: {len(subtitles)} (Time: {time.time() - start_time:.2f}s)")
     return subtitles
@@ -80,19 +98,24 @@ def load_subtitles(subtitle_file):
 # -------------------- Score Normalizer --------------------
 
 def _normalize_score(result: dict, label_type: str):
-    label = result["label"].upper()
+    label = result["label"].lower()
     confidence = result["score"]
 
-    if label_type == "star_rating":
+    if label_type == "goemotions":
+        if label in ["excitement", "surprise", "joy"]:
+            excitement_score = confidence
+        else:
+            excitement_score = 0.0 # Force neutral, sadness, fear, admiration, etc to 0
+    elif label_type == "emotion":
         try:
             rating = int(label[0])
         except (ValueError, IndexError):
             rating = 3
         excitement_score = (rating - 1) / 4.0
     else:
-        if "positive" in label.lower() or label == "LABEL_2":
+        if "positive" in label or label == "label_2":
             excitement_score = confidence
-        elif "neutral" in label.lower() or label == "LABEL_1":
+        elif "neutral" in label or label == "label_1":
             excitement_score = confidence * 0.4
         else:
             excitement_score = 1.0 - confidence
@@ -142,7 +165,37 @@ def analyze_excitement(subtitles, model_key: str = "bert", logger=None):
         excitement_score, confidence = _normalize_score(result, model_info["label_type"])
         confidence_scores.append(confidence)
 
-        if excitement_score >= 0.98:
+        text_lower = text.lower()
+        bonus = 0.0
+        
+        # Positive Live Action Keywords
+        positive_keywords = ["goal", "penalty", "scores", "brilliant", "strike", "chance", "wow", "unbelievable"]
+        for kw in positive_keywords:
+            if re.search(r'\b' + kw + r'\b', text_lower):
+                bonus += 0.30
+                break
+                
+        # Player Name Conditional Keywords
+        player_names = ["messi", "mbappe", "martinez", "modric", "gakpo", "giroud", "di maria"]
+        word_count = len(text_lower.split())
+        for player in player_names:
+            if re.search(r'\b' + player + r'\b', text_lower):
+                if word_count <= 3:
+                    bonus += 0.30
+                elif excitement_score >= 0.30:
+                    bonus += 0.20
+                break
+                
+        # Negative Historical Commentary Keywords
+        negative_keywords = ["last week", "yesterday", "reminds me", "scored", "previously", "first half", "history", "record", "saved"]
+        for kw in negative_keywords:
+            if re.search(r'\b' + kw + r'\b', text_lower):
+                bonus -= 0.50
+                break
+                
+        excitement_score += bonus
+
+        if excitement_score >= 0.50:
             adjusted_start, adjusted_end = adjust_timestamps(start_time, end_time)
             exciting_timestamps.append((adjusted_start, adjusted_end))
             highlights_found += 1
@@ -154,8 +207,8 @@ def analyze_excitement(subtitles, model_key: str = "bert", logger=None):
     avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0
 
     safe_analysis_time = max(0.1, analysis_time)
-    safe_load_time = max(0.1, model_load_time)
-    efficiency_score = (avg_confidence * (highlights_found / max(1, len(subtitles)))) / (safe_analysis_time * safe_load_time)
+    throughput = len(subtitles) / safe_analysis_time
+    efficiency_score = (avg_confidence * throughput) / 10.0
     
     metrics = {
         "model_key": model_key,
@@ -178,26 +231,47 @@ def analyze_excitement(subtitles, model_key: str = "bert", logger=None):
 def adjust_timestamps(start, end):
     start_dt = datetime.strptime(start, "%H:%M:%S,%f")
     end_dt = datetime.strptime(end, "%H:%M:%S,%f")
-    # No extra padding, just use the subtitle duration
+    
+    pad_seconds = timedelta(seconds=5)
+    zero_dt = datetime.strptime("00:00:00,000", "%H:%M:%S,%f")
+    
+    if start_dt - pad_seconds >= zero_dt:
+        start_dt -= pad_seconds
+    else:
+        start_dt = zero_dt
+        
     return start_dt.strftime("%H:%M:%S,%f")[:-3], end_dt.strftime("%H:%M:%S,%f")[:-3]
 
 
-def merge_overlapping_timestamps(timestamps):
+def merge_overlapping_timestamps(timestamps, gap_tolerance_sec=15.0, min_density=1, min_duration_sec=4.0):
     if not timestamps:
         return []
     merged_timestamps = []
     timestamps.sort()
+    
     current_start, current_end = timestamps[0]
+    density = 1
+    
     for next_start, next_end in timestamps[1:]:
         current_end_dt = datetime.strptime(current_end, "%H:%M:%S,%f")
         next_start_dt = datetime.strptime(next_start, "%H:%M:%S,%f")
-        # Only merge if they strictly overlap or touch (0s gap tolerance)
-        if next_start_dt <= current_end_dt:
+        
+        gap = (next_start_dt - current_end_dt).total_seconds()
+        
+        if gap <= gap_tolerance_sec:
             current_end = max(current_end, next_end)
+            density += 1
         else:
-            merged_timestamps.append((current_start, current_end))
+            duration = (datetime.strptime(current_end, "%H:%M:%S,%f") - datetime.strptime(current_start, "%H:%M:%S,%f")).total_seconds()
+            if density >= min_density or duration >= min_duration_sec:
+                merged_timestamps.append((current_start, current_end))
             current_start, current_end = next_start, next_end
-    merged_timestamps.append((current_start, current_end))
+            density = 1
+            
+    duration = (datetime.strptime(current_end, "%H:%M:%S,%f") - datetime.strptime(current_start, "%H:%M:%S,%f")).total_seconds()
+    if density >= min_density or duration >= min_duration_sec:
+        merged_timestamps.append((current_start, current_end))
+        
     return merged_timestamps
 
 
