@@ -124,7 +124,7 @@ def _normalize_score(result: dict, label_type: str):
 
 # -------------------- Main Analysis --------------------
 
-def analyze_excitement(subtitles, model_key: str = "bert", logger=None):
+def analyze_excitement(subtitles, model_key: str = "bert", logger=None, fastest_model_throughput: float = 100.0):
     def log(msg):
         print(msg)
         if logger:
@@ -208,7 +208,12 @@ def analyze_excitement(subtitles, model_key: str = "bert", logger=None):
 
     safe_analysis_time = max(0.1, analysis_time)
     throughput = len(subtitles) / safe_analysis_time
-    efficiency_score = (avg_confidence * throughput) / 10.0
+
+    # Relative Speed Ratio normalized against fastest benchmark throughput (0.0 to 1.0)
+    speed_ratio = min(1.0, throughput / max(0.1, fastest_model_throughput))
+
+    # Hardware-independent normalized efficiency score strictly bounded in [0.0, 1.0]
+    efficiency_score = avg_confidence * speed_ratio
     
     metrics = {
         "model_key": model_key,
@@ -217,6 +222,8 @@ def analyze_excitement(subtitles, model_key: str = "bert", logger=None):
         "model_load_time": round(model_load_time, 3),
         "analysis_time": round(analysis_time, 3),
         "total_subtitles": len(subtitles),
+        "throughput": round(throughput, 2),
+        "speed_ratio": round(speed_ratio, 4),
         "highlights_found": highlights_found,
         "avg_confidence": round(avg_confidence, 4),
         "efficiency_score": round(efficiency_score, 4),
